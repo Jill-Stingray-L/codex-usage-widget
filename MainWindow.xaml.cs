@@ -1,4 +1,6 @@
 using System.ComponentModel;
+using System.IO;
+using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -14,8 +16,14 @@ public partial class MainWindow : Window
     private readonly CodexAppServerClient _client = new();
     private readonly DispatcherTimer _refreshTimer;
     private readonly Forms.NotifyIcon _trayIcon;
+    private Forms.ToolStripMenuItem? _desktopWidgetModeItem;
+    private Forms.ToolStripMenuItem? _taskbarIndicatorModeItem;
+    private System.Drawing.Icon? _generatedTrayIcon;
+    private WidgetDisplayMode _displayMode = LoadDisplayMode();
     private bool _isRefreshing;
     private bool _allowClose;
+
+    public bool StartsInTaskbarIndicatorMode => _displayMode == WidgetDisplayMode.TaskbarIndicator;
 
     public MainWindow()
     {
@@ -30,6 +38,7 @@ public partial class MainWindow : Window
         _trayIcon = BuildTrayIcon();
 
         Loaded += MainWindow_OnLoaded;
+        Deactivated += MainWindow_OnDeactivated;
         Closing += MainWindow_OnClosing;
     }
 
@@ -39,16 +48,38 @@ public partial class MainWindow : Window
         menu.Items.Add("Open", null, (_, _) => Dispatcher.Invoke(ShowWidget));
         menu.Items.Add("Refresh", null, (_, _) => Dispatcher.InvokeAsync(RefreshAsync));
         menu.Items.Add(new Forms.ToolStripSeparator());
+
+        var displayModeMenu = new Forms.ToolStripMenuItem("Display mode");
+        _desktopWidgetModeItem = new Forms.ToolStripMenuItem(
+            "Desktop widget",
+            null,
+            (_, _) => Dispatcher.Invoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget)));
+        _taskbarIndicatorModeItem = new Forms.ToolStripMenuItem(
+            "Taskbar indicator",
+            null,
+            (_, _) => Dispatcher.Invoke(() => SetDisplayMode(WidgetDisplayMode.TaskbarIndicator)));
+        displayModeMenu.DropDownItems.Add(_desktopWidgetModeItem);
+        displayModeMenu.DropDownItems.Add(_taskbarIndicatorModeItem);
+        menu.Items.Add(displayModeMenu);
+        menu.Items.Add(new Forms.ToolStripSeparator());
         menu.Items.Add("Exit", null, (_, _) => Dispatcher.Invoke(ExitApplication));
 
+        _generatedTrayIcon = CreateUsageIcon(null);
         var icon = new Forms.NotifyIcon
         {
-            Icon = System.Drawing.SystemIcons.Information,
+            Icon = _generatedTrayIcon,
             Text = "Codex Usage Widget",
             Visible = true,
             ContextMenuStrip = menu
         };
-        icon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowWidget);
+        icon.MouseClick += (_, args) =>
+        {
+            if (args.Button == Forms.MouseButtons.Left)
+            {
+                Dispatcher.Invoke(ShowWidget);
+            }
+        };
+        UpdateDisplayModeMenu();
         return icon;
     }
 
@@ -112,6 +143,7 @@ public partial class MainWindow : Window
         SetStatus(snapshot.PlanType is null ? "Live · ChatGPT" : $"Live · {snapshot.PlanType}", "#65D892");
         UpdatedText.Text = $"Local-only · updated {snapshot.FetchedAt:HH:mm:ss}";
         _trayIcon.Text = $"Codex · {Math.Round(primary.RemainingPercent):0}% remaining";
+        UpdateTrayUsageIcon(primary.RemainingPercent);
     }
 
     private static void RenderWindow(
@@ -140,6 +172,7 @@ public partial class MainWindow : Window
         UpdatedText.Text = "Local-only · click ↻ to retry";
         SetStatus("Offline", "#F07B7B");
         _trayIcon.Text = "Codex Usage · unavailable";
+        UpdateTrayUsageIcon(null);
     }
 
     private static string ToFriendlyError(string message)
@@ -216,7 +249,8 @@ public partial class MainWindow : Window
 
     private async void RefreshButton_OnClick(object sender, RoutedEventArgs e) => await RefreshAsync();
 
-    private void HideButton_OnClick(object sender, RoutedEventArgs e) => Hide();
+    private void HideButton_OnClick(object sender, RoutedEventArgs e) =>
+        SetDisplayMode(WidgetDisplayMode.TaskbarIndicator);
 
     private void CloseButton_OnClick(object sender, RoutedEventArgs e) => ExitApplication();
 
@@ -226,6 +260,141 @@ public partial class MainWindow : Window
         WindowState = WindowState.Normal;
         Activate();
     }
+
+    private void SetDisplayMode(WidgetDisplayMode mode)
+    {
+        _displayMode = mode;
+        SaveDisplayMode(mode);
+        UpdateDisplayModeMenu();
+
+        if (mode == WidgetDisplayMode.DesktopWidget)
+        {
+            ShowWidget();
+        }
+        else
+        {
+            Hide();
+        }
+    }
+
+    private void UpdateDisplayModeMenu()
+    {
+        if (_desktopWidgetModeItem is not null)
+        {
+            _desktopWidgetModeItem.Checked = _displayMode == WidgetDisplayMode.DesktopWidget;
+        }
+
+        if (_taskbarIndicatorModeItem is not null)
+        {
+            _taskbarIndicatorModeItem.Checked = _displayMode == WidgetDisplayMode.TaskbarIndicator;
+        }
+    }
+
+    private void MainWindow_OnDeactivated(object? sender, EventArgs e)
+    {
+        if (_displayMode == WidgetDisplayMode.TaskbarIndicator)
+        {
+            Hide();
+        }
+    }
+
+    private void UpdateTrayUsageIcon(double? remainingPercent)
+    {
+        var nextIcon = CreateUsageIcon(remainingPercent);
+        var previousIcon = _generatedTrayIcon;
+        _generatedTrayIcon = nextIcon;
+        _trayIcon.Icon = nextIcon;
+        previousIcon?.Dispose();
+    }
+
+    private static System.Drawing.Icon CreateUsageIcon(double? remainingPercent)
+    {
+        using var bitmap = new System.Drawing.Bitmap(64, 64);
+        using var graphics = System.Drawing.Graphics.FromImage(bitmap);
+        graphics.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+        graphics.TextRenderingHint = System.Drawing.Text.TextRenderingHint.AntiAliasGridFit;
+
+        var indicatorColor = remainingPercent switch
+        {
+            <= 10 => System.Drawing.Color.FromArgb(240, 112, 112),
+            <= 25 => System.Drawing.Color.FromArgb(240, 179, 94),
+            _ => System.Drawing.Color.FromArgb(101, 216, 146)
+        };
+
+        using var backgroundBrush = new System.Drawing.SolidBrush(System.Drawing.Color.FromArgb(22, 29, 39));
+        using var borderPen = new System.Drawing.Pen(indicatorColor, 6f);
+        graphics.FillEllipse(backgroundBrush, 3, 3, 58, 58);
+        graphics.DrawEllipse(borderPen, 6, 6, 52, 52);
+
+        var text = remainingPercent is null
+            ? "?"
+            : Math.Round(Math.Clamp(remainingPercent.Value, 0d, 100d)).ToString("0");
+        var fontSize = text.Length >= 3 ? 18f : 24f;
+        using var font = new System.Drawing.Font(
+            "Segoe UI",
+            fontSize,
+            System.Drawing.FontStyle.Bold,
+            System.Drawing.GraphicsUnit.Pixel);
+        using var textBrush = new System.Drawing.SolidBrush(System.Drawing.Color.White);
+        var textSize = graphics.MeasureString(text, font);
+        graphics.DrawString(
+            text,
+            font,
+            textBrush,
+            (64f - textSize.Width) / 2f,
+            (64f - textSize.Height) / 2f - 1f);
+
+        var iconHandle = bitmap.GetHicon();
+        try
+        {
+            using var temporaryIcon = System.Drawing.Icon.FromHandle(iconHandle);
+            return (System.Drawing.Icon)temporaryIcon.Clone();
+        }
+        finally
+        {
+            DestroyIcon(iconHandle);
+        }
+    }
+
+    private static WidgetDisplayMode LoadDisplayMode()
+    {
+        try
+        {
+            var value = File.ReadAllText(DisplayModePath).Trim();
+            return value.Equals("taskbar", StringComparison.OrdinalIgnoreCase)
+                ? WidgetDisplayMode.TaskbarIndicator
+                : WidgetDisplayMode.DesktopWidget;
+        }
+        catch
+        {
+            return WidgetDisplayMode.DesktopWidget;
+        }
+    }
+
+    private static void SaveDisplayMode(WidgetDisplayMode mode)
+    {
+        try
+        {
+            var directory = Path.GetDirectoryName(DisplayModePath)!;
+            Directory.CreateDirectory(directory);
+            File.WriteAllText(
+                DisplayModePath,
+                mode == WidgetDisplayMode.TaskbarIndicator ? "taskbar" : "widget");
+        }
+        catch
+        {
+            // Preferences are best-effort; usage display should keep working.
+        }
+    }
+
+    private static string DisplayModePath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "CodexUsageWidget",
+        "display-mode.txt");
+
+    [DllImport("user32.dll", SetLastError = true)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool DestroyIcon(IntPtr iconHandle);
 
     private void ExitApplication()
     {
@@ -238,14 +407,21 @@ public partial class MainWindow : Window
         if (!_allowClose)
         {
             e.Cancel = true;
-            Hide();
+            SetDisplayMode(WidgetDisplayMode.TaskbarIndicator);
             return;
         }
 
         _refreshTimer.Stop();
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
+        _generatedTrayIcon?.Dispose();
         _client.DisposeAsync().AsTask().GetAwaiter().GetResult();
         System.Windows.Application.Current.Shutdown();
+    }
+
+    private enum WidgetDisplayMode
+    {
+        DesktopWidget,
+        TaskbarIndicator
     }
 }

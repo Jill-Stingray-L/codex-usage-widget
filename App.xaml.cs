@@ -10,5 +10,9 @@ public partial class App : System.Windows.Application
         var window = new MainWindow();
         MainWindow = window;
         window.Show();
+        if (window.StartsInTaskbarIndicatorMode)
+        {
+            window.Hide();
+        }
     }
 }

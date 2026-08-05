@@ -99,7 +99,7 @@
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
                     <Button ToolTip="Refresh" Style="{StaticResource IconButton}" Click="RefreshButton_OnClick" Content="↻" />
-                    <Button ToolTip="Hide to tray" Style="{StaticResource IconButton}" Click="HideButton_OnClick" Content="−" />
+                    <Button ToolTip="Use taskbar indicator" Style="{StaticResource IconButton}" Click="HideButton_OnClick" Content="−" />
                     <Button ToolTip="Exit" Style="{StaticResource IconButton}" Click="CloseButton_OnClick" Content="×" />
                 </StackPanel>
             </Grid>
