@@ -109,7 +109,6 @@ public partial class MainWindow : Window
         PrimaryPanel.Visibility = Visibility.Visible;
 
         RemainingText.Text = $"{Math.Round(primary.RemainingPercent):0}%";
-        UpdateUsageArc(primary.RemainingPercent);
         SetStatus(snapshot.PlanType is null ? "Live · ChatGPT" : $"Live · {snapshot.PlanType}", "#65D892");
         UpdatedText.Text = $"Local-only · updated {snapshot.FetchedAt:HH:mm:ss}";
         _trayIcon.Text = $"Codex · {Math.Round(primary.RemainingPercent):0}% remaining";
@@ -134,7 +133,6 @@ public partial class MainWindow : Window
     private void RenderError(string message)
     {
         RemainingText.Text = "--%";
-        UsageArc.Data = null;
         PrimaryLabel.Text = "Usage unavailable";
         PrimaryPercent.Text = string.Empty;
         PrimaryProgress.Value = 0;
@@ -166,51 +164,6 @@ public partial class MainWindow : Window
         StatusText.Text = text;
         StatusDot.Fill = new SolidColorBrush(
             (System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(color));
-    }
-
-    private void UpdateUsageArc(double remainingPercent)
-    {
-        var value = Math.Clamp(remainingPercent, 0d, 100d);
-        var center = new System.Windows.Point(33, 33);
-        const double radius = 29.5;
-
-        UsageArc.Stroke = new SolidColorBrush(ColorForRemaining(value));
-
-        if (value <= 0.01)
-        {
-            UsageArc.Data = null;
-            return;
-        }
-
-        if (value >= 99.99)
-        {
-            UsageArc.Data = new EllipseGeometry(center, radius, radius);
-            return;
-        }
-
-        var startAngle = -90d;
-        var endAngle = startAngle + (value / 100d * 360d);
-        var start = PointOnCircle(center, radius, startAngle);
-        var end = PointOnCircle(center, radius, endAngle);
-
-        var figure = new PathFigure { StartPoint = start, IsClosed = false };
-        figure.Segments.Add(new ArcSegment
-        {
-            Point = end,
-            Size = new System.Windows.Size(radius, radius),
-            SweepDirection = SweepDirection.Clockwise,
-            IsLargeArc = value > 50d
-        });
-
-        UsageArc.Data = new PathGeometry(new[] { figure });
-    }
-
-    private static System.Windows.Point PointOnCircle(System.Windows.Point center, double radius, double angleDegrees)
-    {
-        var radians = angleDegrees * Math.PI / 180d;
-        return new System.Windows.Point(
-            center.X + radius * Math.Cos(radians),
-            center.Y + radius * Math.Sin(radians));
     }
 
     private static System.Windows.Media.Color ColorForRemaining(double remainingPercent) => remainingPercent switch
