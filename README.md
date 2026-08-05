@@ -30,13 +30,18 @@ therefore not required on the destination computer.
 
 ## Install on another computer
 
-1. Download the `codex-usage-widget-win-x64.zip` build artifact or create it with
-   `scripts/publish.ps1`.
+1. Download the
+   [latest Windows x64 portable release](https://github.com/ognjeeen/codex-usage-widget/releases/latest/download/codex-usage-widget-win-x64.zip).
 2. Extract the ZIP to a permanent directory.
 3. Ensure `codex --version` works in PowerShell and run `codex login` if needed.
 4. Start `CodexUsageWidget.exe`.
 
 Only one instance can run at a time. Starting the executable again exits quietly.
+
+The executable is not currently code-signed, so Windows may identify the
+publisher as unknown. A SHA-256 checksum is attached to every
+[GitHub Release](https://github.com/ognjeeen/codex-usage-widget/releases) for
+verification before running the application.
 
 If Codex is installed in a non-standard location, set
 `CODEX_USAGE_WIDGET_CODEX_PATH` to the full path of `codex.cmd` or `codex.exe`.
@@ -75,6 +80,9 @@ artifacts/release/codex-usage-widget-win-x64.zip
 ```
 
 `win-arm64` is also supported through the script's `-Runtime` parameter.
+
+Maintainer release instructions are documented in
+[docs/RELEASING.md](docs/RELEASING.md).
 
 ## Local data
 
