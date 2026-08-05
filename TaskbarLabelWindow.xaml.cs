@@ -97,7 +97,7 @@ public partial class TaskbarLabelWindow : Window
 
         var dpi = GetDpiForWindow(taskbar);
         var scale = dpi > 0 ? dpi / 96d : 1d;
-        var width = (int)Math.Round(82d * scale);
+        var width = (int)Math.Round(94d * scale);
         var height = (int)Math.Round(40d * scale);
         var gap = 0;
         var left = trayLeft - width - gap;
