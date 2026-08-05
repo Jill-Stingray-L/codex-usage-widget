@@ -38,6 +38,8 @@ public partial class TaskbarLabelWindow : Window
 
     public event EventHandler? ExitRequested;
 
+    public bool IsPointerOver => IsMouseOver;
+
     public void ShowLabel()
     {
         if (!IsVisible)
@@ -60,13 +62,13 @@ public partial class TaskbarLabelWindow : Window
         if (remainingPercent is null)
         {
             UsageText.Text = "--%";
-            ToolTip = "Codex usage is currently unavailable.";
+            LabelSurface.ToolTip = "Codex usage is currently unavailable.";
             return;
         }
 
         var value = Math.Round(Math.Clamp(remainingPercent.Value, 0d, 100d));
         UsageText.Text = $"{value:0}%";
-        ToolTip = resetsAt is null
+        LabelSurface.ToolTip = resetsAt is null
             ? $"Codex: {value:0}% remaining"
             : $"Codex: {value:0}% remaining · resets {resetsAt.Value:ddd HH:mm}";
     }

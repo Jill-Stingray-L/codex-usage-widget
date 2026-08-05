@@ -2,10 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Codex Usage"
-        Width="340"
-        Height="158"
-        MinWidth="340"
-        MinHeight="158"
+        Width="364"
+        Height="182"
+        MinWidth="364"
+        MinHeight="182"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -42,14 +42,15 @@
         </Style>
     </Window.Resources>
 
-    <Border Margin="6"
+    <Border x:Name="WidgetSurface"
+            Margin="18"
             CornerRadius="20"
             Background="#F2171D27"
             BorderBrush="#354254"
             BorderThickness="1"
             MouseLeftButtonDown="Widget_OnMouseLeftButtonDown">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="18" ShadowDepth="5" Opacity="0.38" Color="#000000" />
+            <DropShadowEffect BlurRadius="14" ShadowDepth="3" Opacity="0.24" Color="#000000" />
         </Border.Effect>
         <Grid>
             <Grid.RowDefinitions>
@@ -146,6 +147,7 @@
             <Border Grid.Row="2" Margin="16,0,16,0" BorderBrush="#263344" BorderThickness="0,1,0,0">
                 <TextBlock x:Name="UpdatedText"
                            Text="Local-only · waiting for sync"
+                           Margin="0,-2,0,0"
                            VerticalAlignment="Center"
                            FontFamily="{StaticResource UiFont}"
                            FontSize="9.5"

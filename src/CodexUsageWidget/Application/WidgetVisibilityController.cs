@@ -15,6 +15,14 @@ public sealed class WidgetVisibilityController
 
     public void Show() => _show();
 
+    public void HideOnDeactivated(bool taskbarInteractionInProgress)
+    {
+        if (!taskbarInteractionInProgress)
+        {
+            _hide();
+        }
+    }
+
     public void Toggle()
     {
         if (_isVisible())

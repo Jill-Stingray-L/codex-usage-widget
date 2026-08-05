@@ -8,7 +8,7 @@
     <AssemblyName>CodexUsageWidget</AssemblyName>
     <RootNamespace>CodexUsageWidget</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <Authors>Ognjen Marinković</Authors>
     <Company>ognjeeen</Company>
     <Description>Local Windows widget for Codex subscription usage.</Description>

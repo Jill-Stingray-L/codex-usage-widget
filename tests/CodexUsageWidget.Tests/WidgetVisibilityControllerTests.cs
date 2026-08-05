@@ -44,4 +44,31 @@ public sealed class WidgetVisibilityControllerTests
 
         Assert.Equal(1, showCount);
     }
+
+    [Fact]
+    public void TaskbarInteractionSuppressesDeactivationBeforeToggle()
+    {
+        var visible = true;
+        var showCount = 0;
+        var hideCount = 0;
+        var controller = new WidgetVisibilityController(
+            () => visible,
+            () =>
+            {
+                visible = true;
+                showCount++;
+            },
+            () =>
+            {
+                visible = false;
+                hideCount++;
+            });
+
+        controller.HideOnDeactivated(taskbarInteractionInProgress: true);
+        controller.Toggle();
+
+        Assert.False(visible);
+        Assert.Equal(0, showCount);
+        Assert.Equal(1, hideCount);
+    }
 }

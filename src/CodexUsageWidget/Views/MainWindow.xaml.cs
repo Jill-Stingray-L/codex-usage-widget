@@ -51,8 +51,7 @@ public partial class MainWindow : Window
 
         _taskbarLabel.OpenRequested += (_, _) =>
             Dispatcher.BeginInvoke(_widgetVisibility.Show, DispatcherPriority.ApplicationIdle);
-        _taskbarLabel.ToggleRequested += (_, _) =>
-            Dispatcher.BeginInvoke(_widgetVisibility.Toggle, DispatcherPriority.ApplicationIdle);
+        _taskbarLabel.ToggleRequested += (_, _) => _widgetVisibility.Toggle();
         _taskbarLabel.RefreshRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => _ = _usageMonitor.RefreshAsync());
         _taskbarLabel.DesktopModeRequested += (_, _) =>
@@ -152,8 +151,8 @@ public partial class MainWindow : Window
     private void PositionNearWorkAreaEdge()
     {
         var workArea = SystemParameters.WorkArea;
-        Left = workArea.Right - Width - 20;
-        Top = workArea.Bottom - Height - 20;
+        Left = workArea.Right - Width - 20 + WidgetSurface.Margin.Right;
+        Top = workArea.Bottom - Height - 20 + WidgetSurface.Margin.Bottom;
     }
 
     private void ShowWidget()
@@ -217,7 +216,7 @@ public partial class MainWindow : Window
     {
         if (_displayMode == WidgetDisplayMode.TaskbarIndicator)
         {
-            Hide();
+            _widgetVisibility.HideOnDeactivated(_taskbarLabel.IsPointerOver);
         }
     }
 

@@ -14,10 +14,12 @@
     <Border x:Name="LabelSurface"
             CornerRadius="4"
             Cursor="Hand"
+            ToolTipService.Placement="Top"
+            ToolTipService.VerticalOffset="-8"
             MouseLeftButtonUp="LabelSurface_OnMouseLeftButtonUp">
         <Border.Style>
             <Style TargetType="Border">
-                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="Background" Value="#01000000" />
                 <Style.Triggers>
                     <Trigger Property="IsMouseOver" Value="True">
                         <Setter Property="Background" Value="#20FFFFFF" />
