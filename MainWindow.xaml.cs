@@ -21,6 +21,7 @@ public partial class MainWindow : Window
     private Forms.ToolStripMenuItem? _taskbarIndicatorModeItem;
     private System.Drawing.Icon? _generatedTrayIcon;
     private WidgetDisplayMode _displayMode = LoadDisplayMode();
+    private double _primaryUsedPercent;
     private bool _isRefreshing;
     private bool _allowClose;
 
@@ -29,6 +30,8 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        PrimaryProgressTrack.SizeChanged += (_, _) => UpdatePrimaryProgressFill();
 
         _taskbarLabel = new TaskbarLabelWindow();
         _taskbarLabel.OpenRequested += (_, _) => Dispatcher.Invoke(ShowWidget);
@@ -148,7 +151,7 @@ public partial class MainWindow : Window
         }
 
         var primary = snapshot.Windows[0];
-        RenderWindow(primary, PrimaryLabel, PrimaryPercent, PrimaryProgress, PrimaryReset);
+        RenderWindow(primary);
         PrimaryPanel.Visibility = Visibility.Visible;
 
         RemainingText.Text = $"{Math.Round(primary.RemainingPercent):0}%";
@@ -159,20 +162,22 @@ public partial class MainWindow : Window
         _taskbarLabel.UpdateUsage(primary.RemainingPercent, primary.ResetsAt);
     }
 
-    private static void RenderWindow(
-        UsageWindow window,
-        System.Windows.Controls.TextBlock label,
-        System.Windows.Controls.TextBlock percent,
-        System.Windows.Controls.ProgressBar progress,
-        System.Windows.Controls.TextBlock reset)
+    private void RenderWindow(UsageWindow window)
     {
-        label.Text = window.Label;
-        percent.Text = $"{Math.Round(window.UsedPercent):0}% used";
-        progress.Value = window.UsedPercent;
-        progress.Foreground = new SolidColorBrush(ColorForRemaining(window.RemainingPercent));
-        reset.Text = window.ResetsAt is null
+        PrimaryLabel.Text = window.Label;
+        PrimaryPercent.Text = $"{Math.Round(window.UsedPercent):0}% used";
+        _primaryUsedPercent = Math.Clamp(window.UsedPercent, 0d, 100d);
+        PrimaryProgressFill.Background = new SolidColorBrush(ColorForRemaining(window.RemainingPercent));
+        UpdatePrimaryProgressFill();
+        PrimaryReset.Text = window.ResetsAt is null
             ? "Reset time unavailable"
             : $"Resets {FormatReset(window.ResetsAt.Value)}";
+    }
+
+    private void UpdatePrimaryProgressFill()
+    {
+        PrimaryProgressFill.Width = Math.Max(0d, PrimaryProgressTrack.ActualWidth) *
+                                    (_primaryUsedPercent / 100d);
     }
 
     private void RenderError(string message)
@@ -180,7 +185,8 @@ public partial class MainWindow : Window
         RemainingText.Text = "--%";
         PrimaryLabel.Text = "Usage unavailable";
         PrimaryPercent.Text = string.Empty;
-        PrimaryProgress.Value = 0;
+        _primaryUsedPercent = 0;
+        UpdatePrimaryProgressFill();
         PrimaryReset.Text = message;
         UpdatedText.Text = "Local-only · click ↻ to retry";
         SetStatus("Offline", "#F07B7B");
