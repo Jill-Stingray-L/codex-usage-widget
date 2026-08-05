@@ -13,5 +13,10 @@
     <Company>ognjeeen</Company>
     <Description>Local Windows widget for Codex subscription usage.</Description>
     <RepositoryUrl>https://github.com/ognjeeen/codex-usage-widget</RepositoryUrl>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
+  <ItemGroup>
+    <None Include="..\..\LICENSE" Link="LICENSE" CopyToPublishDirectory="PreserveNewest" />
+    <None Include="..\..\README.md" Link="README.md" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

@@ -95,3 +95,9 @@ runtime flow, and extension guidance.
 
 This displays ChatGPT/Codex subscription rate limits. It does not display OpenAI
 API billing or API-key usage, which use a different accounting system.
+
+## License
+
+Released under the [MIT License](LICENSE). You may use, modify, fork, publish,
+redistribute, sublicense, or sell copies of the software as long as the copyright
+notice and license text are retained.

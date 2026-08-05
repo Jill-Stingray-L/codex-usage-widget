@@ -39,7 +39,6 @@ try {
         -o $publishDirectory
     if ($LASTEXITCODE -ne 0) { throw 'Publish failed.' }
 
-    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'README.md') -Destination $publishDirectory
     if ([IO.File]::Exists($archivePath)) {
         [IO.File]::Delete($archivePath)
     }
