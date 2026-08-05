@@ -2,7 +2,6 @@ using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Interop;
-using System.Windows.Media;
 
 namespace CodexUsageWidget;
 
@@ -66,20 +65,13 @@ public partial class TaskbarLabelWindow : Window
     {
         if (remainingPercent is null)
         {
-            UsageText.Text = "unavailable";
-            StatusDot.Fill = BrushFromHex("#F07070");
+            UsageText.Text = "--%";
             ToolTip = "Codex usage is currently unavailable.";
             return;
         }
 
         var value = Math.Round(Math.Clamp(remainingPercent.Value, 0d, 100d));
-        UsageText.Text = $"{value:0}% left";
-        StatusDot.Fill = BrushFromHex(value switch
-        {
-            <= 10 => "#F07070",
-            <= 25 => "#F0B35E",
-            _ => "#65D892"
-        });
+        UsageText.Text = $"{value:0}%";
         ToolTip = resetsAt is null
             ? $"Codex: {value:0}% remaining"
             : $"Codex: {value:0}% remaining · resets {resetsAt.Value:ddd HH:mm}";
@@ -105,9 +97,9 @@ public partial class TaskbarLabelWindow : Window
 
         var dpi = GetDpiForWindow(taskbar);
         var scale = dpi > 0 ? dpi / 96d : 1d;
-        var width = (int)Math.Round(142d * scale);
-        var height = (int)Math.Round(30d * scale);
-        var gap = (int)Math.Round(7d * scale);
+        var width = (int)Math.Round(82d * scale);
+        var height = (int)Math.Round(40d * scale);
+        var gap = 0;
         var left = trayLeft - width - gap;
         var top = taskbarRect.Top + Math.Max(0, (taskbarRect.Bottom - taskbarRect.Top - height) / 2);
 
@@ -120,9 +112,6 @@ public partial class TaskbarLabelWindow : Window
             height,
             SwpNoActivate | SwpShowWindow);
     }
-
-    private static SolidColorBrush BrushFromHex(string value) =>
-        new((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(value));
 
     private void LabelSurface_OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e) =>
         OpenRequested?.Invoke(this, EventArgs.Empty);

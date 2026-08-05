@@ -18,8 +18,9 @@ listens for `account/rateLimits/updated` notifications.
 ## Display modes
 
 - **Desktop widget** keeps the compact window visible and always on top.
-- **Taskbar label** hides the window and shows a readable `Codex · 78% left` label
-  directly beside the notification area. Left-click the label to open the widget temporarily.
+- **Taskbar label** hides the window and shows a native-looking `Codex 78%` label
+  directly beside the notification area. It has no permanent card or border and only
+  shows a subtle Windows-style background on hover. Left-click it to open the widget temporarily.
 
 Use the `−` button to switch to the taskbar label. Right-click the label and open
 **Display mode** to switch between modes. The small notification icon remains as a
