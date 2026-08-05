@@ -38,13 +38,13 @@
         <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
             <TextBlock Text="Codex"
                        FontFamily="Segoe UI Variable Display, Segoe UI"
-                       FontSize="13"
+                       FontSize="12"
                        Foreground="#E7E7E7" />
             <TextBlock x:Name="UsageText"
                        Margin="5,0,0,0"
                        Text="--%"
                        FontFamily="Segoe UI Variable Display, Segoe UI"
-                       FontSize="13"
+                       FontSize="12"
                        FontWeight="SemiBold"
                        Foreground="#FFFFFF" />
         </StackPanel>
