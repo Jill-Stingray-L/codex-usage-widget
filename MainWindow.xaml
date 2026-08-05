@@ -2,10 +2,10 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Codex Usage"
-        Width="372"
-        Height="318"
-        MinWidth="372"
-        MinHeight="318"
+        Width="270"
+        Height="146"
+        MinWidth="270"
+        MinHeight="146"
         WindowStyle="None"
         AllowsTransparency="True"
         Background="Transparent"
@@ -17,17 +17,17 @@
         <SolidColorBrush x:Key="TextPrimary" Color="#F4F7FB" />
         <SolidColorBrush x:Key="TextSecondary" Color="#8C99AA" />
         <Style x:Key="IconButton" TargetType="Button">
-            <Setter Property="Width" Value="28" />
-            <Setter Property="Height" Value="28" />
+            <Setter Property="Width" Value="22" />
+            <Setter Property="Height" Value="22" />
             <Setter Property="Foreground" Value="#AAB4C2" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderThickness" Value="0" />
-            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="ButtonBorder" Background="{TemplateBinding Background}" CornerRadius="8">
+                        <Border x:Name="ButtonBorder" Background="{TemplateBinding Background}" CornerRadius="6">
                             <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
@@ -41,7 +41,7 @@
             </Setter>
         </Style>
         <Style x:Key="UsageProgress" TargetType="ProgressBar">
-            <Setter Property="Height" Value="6" />
+            <Setter Property="Height" Value="5" />
             <Setter Property="Maximum" Value="100" />
             <Setter Property="Background" Value="#253142" />
             <Setter Property="Foreground" Value="#65D892" />
@@ -50,9 +50,9 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="ProgressBar">
                         <Grid SnapsToDevicePixels="True">
-                            <Border Background="{TemplateBinding Background}" CornerRadius="3" />
+                            <Border Background="{TemplateBinding Background}" CornerRadius="2.5" />
                             <Grid x:Name="PART_Indicator" HorizontalAlignment="Left">
-                                <Border Background="{TemplateBinding Foreground}" CornerRadius="3" />
+                                <Border Background="{TemplateBinding Foreground}" CornerRadius="2.5" />
                             </Grid>
                         </Grid>
                     </ControlTemplate>
@@ -61,39 +61,40 @@
         </Style>
     </Window.Resources>
 
-    <Border Margin="9"
-            CornerRadius="24"
+    <Border Margin="6"
+            CornerRadius="18"
             Background="#F2171D27"
             BorderBrush="#354254"
-            BorderThickness="1">
+            BorderThickness="1"
+            MouseLeftButtonDown="Widget_OnMouseLeftButtonDown">
         <Border.Effect>
-            <DropShadowEffect BlurRadius="28" ShadowDepth="8" Opacity="0.42" Color="#000000" />
+            <DropShadowEffect BlurRadius="18" ShadowDepth="5" Opacity="0.38" Color="#000000" />
         </Border.Effect>
         <Grid>
             <Grid.RowDefinitions>
-                <RowDefinition Height="58" />
-                <RowDefinition Height="*" />
-                <RowDefinition Height="46" />
+                <RowDefinition Height="38" />
+                <RowDefinition Height="70" />
+                <RowDefinition Height="26" />
             </Grid.RowDefinitions>
 
-            <Grid Grid.Row="0" Margin="18,10,12,4" MouseLeftButtonDown="Header_OnMouseLeftButtonDown">
+            <Grid Grid.Row="0" Margin="13,5,8,0">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
-                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                    <Border Width="32" Height="32" CornerRadius="10" Background="#F1F4F8">
-                        <Grid>
-                            <Ellipse Width="15" Height="15" Stroke="#111822" StrokeThickness="2.2" />
-                            <Ellipse Width="5" Height="5" Fill="#111822" />
-                        </Grid>
-                    </Border>
-                    <StackPanel Margin="10,0,0,0" VerticalAlignment="Center">
-                        <TextBlock Text="CODEX USAGE" FontFamily="{StaticResource UiFont}" FontSize="12" FontWeight="SemiBold" Foreground="{StaticResource TextPrimary}" />
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse x:Name="StatusDot" Width="6" Height="6" Fill="#E6A85A" Margin="0,1,5,0" />
-                            <TextBlock x:Name="StatusText" Text="Connecting…" FontFamily="{StaticResource UiFont}" FontSize="10.5" Foreground="{StaticResource TextSecondary}" />
-                        </StackPanel>
+                <StackPanel VerticalAlignment="Center">
+                    <TextBlock Text="CODEX USAGE"
+                               FontFamily="{StaticResource UiFont}"
+                               FontSize="10.5"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextPrimary}" />
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse x:Name="StatusDot" Width="5" Height="5" Fill="#E6A85A" Margin="0,1,4,0" />
+                        <TextBlock x:Name="StatusText"
+                                   Text="Connecting…"
+                                   FontFamily="{StaticResource UiFont}"
+                                   FontSize="8.5"
+                                   Foreground="{StaticResource TextSecondary}" />
                     </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
@@ -103,83 +104,74 @@
                 </StackPanel>
             </Grid>
 
-            <Grid Grid.Row="1" Margin="22,2,22,2">
+            <Grid Grid.Row="1" Margin="14,0,14,0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="142" />
-                    <ColumnDefinition Width="18" />
+                    <ColumnDefinition Width="66" />
+                    <ColumnDefinition Width="13" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
 
-                <Grid Width="142" Height="142" VerticalAlignment="Center">
-                    <Ellipse Stroke="#263344" StrokeThickness="11" />
+                <Grid Width="66" Height="66" VerticalAlignment="Center">
+                    <Ellipse Stroke="#263344" StrokeThickness="6" />
                     <Path x:Name="UsageArc"
                           Stroke="#65D892"
-                          StrokeThickness="11"
+                          StrokeThickness="6"
                           StrokeStartLineCap="Round"
                           StrokeEndLineCap="Round" />
                     <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
                         <TextBlock x:Name="RemainingText"
                                    Text="--%"
                                    FontFamily="{StaticResource UiFont}"
-                                   FontSize="31"
+                                   FontSize="20"
                                    FontWeight="SemiBold"
                                    Foreground="{StaticResource TextPrimary}"
                                    HorizontalAlignment="Center" />
                         <TextBlock Text="remaining"
                                    Margin="0,-3,0,0"
                                    FontFamily="{StaticResource UiFont}"
-                                   FontSize="10.5"
+                                   FontSize="7.5"
                                    Foreground="{StaticResource TextSecondary}"
                                    HorizontalAlignment="Center" />
                     </StackPanel>
                 </Grid>
 
-                <StackPanel Grid.Column="2" VerticalAlignment="Center">
-                    <StackPanel x:Name="PrimaryPanel">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="PrimaryLabel" Margin="0,0,8,0" Text="Primary window" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource UiFont}" FontSize="11.5" Foreground="{StaticResource TextPrimary}" />
-                            <TextBlock x:Name="PrimaryPercent" Grid.Column="1" Text="--% used" HorizontalAlignment="Right" FontFamily="{StaticResource UiFont}" FontSize="10.5" Foreground="{StaticResource TextSecondary}" />
-                        </Grid>
-                        <ProgressBar x:Name="PrimaryProgress" Margin="0,7,0,5" Style="{StaticResource UsageProgress}" />
-                        <TextBlock x:Name="PrimaryReset" Text="Waiting for Codex…" FontFamily="{StaticResource UiFont}" FontSize="10" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" />
-                    </StackPanel>
-
-                    <Border x:Name="SecondarySeparator" Height="1" Background="#263344" Margin="0,15,0,13" />
-
-                    <StackPanel x:Name="SecondaryPanel">
-                        <Grid>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="*" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
-                            <TextBlock x:Name="SecondaryLabel" Margin="0,0,8,0" Text="Secondary window" TextTrimming="CharacterEllipsis" FontFamily="{StaticResource UiFont}" FontSize="11.5" Foreground="{StaticResource TextPrimary}" />
-                            <TextBlock x:Name="SecondaryPercent" Grid.Column="1" Text="--% used" HorizontalAlignment="Right" FontFamily="{StaticResource UiFont}" FontSize="10.5" Foreground="{StaticResource TextSecondary}" />
-                        </Grid>
-                        <ProgressBar x:Name="SecondaryProgress" Margin="0,7,0,5" Style="{StaticResource UsageProgress}" />
-                        <TextBlock x:Name="SecondaryReset" Text="No second window" FontFamily="{StaticResource UiFont}" FontSize="10" Foreground="{StaticResource TextSecondary}" TextWrapping="Wrap" />
-                    </StackPanel>
+                <StackPanel x:Name="PrimaryPanel" Grid.Column="2" VerticalAlignment="Center">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock x:Name="PrimaryLabel"
+                                   Margin="0,0,7,0"
+                                   Text="Primary window"
+                                   TextTrimming="CharacterEllipsis"
+                                   FontFamily="{StaticResource UiFont}"
+                                   FontSize="9.5"
+                                   Foreground="{StaticResource TextPrimary}" />
+                        <TextBlock x:Name="PrimaryPercent"
+                                   Grid.Column="1"
+                                   Text="--% used"
+                                   FontFamily="{StaticResource UiFont}"
+                                   FontSize="8.5"
+                                   Foreground="{StaticResource TextSecondary}" />
+                    </Grid>
+                    <ProgressBar x:Name="PrimaryProgress" Margin="0,6,0,5" Style="{StaticResource UsageProgress}" />
+                    <TextBlock x:Name="PrimaryReset"
+                               Text="Waiting for Codex…"
+                               FontFamily="{StaticResource UiFont}"
+                               FontSize="8"
+                               Foreground="{StaticResource TextSecondary}"
+                               TextTrimming="CharacterEllipsis" />
                 </StackPanel>
             </Grid>
 
-            <Border Grid.Row="2" Margin="18,0,18,0" BorderBrush="#263344" BorderThickness="0,1,0,0">
-                <Grid Margin="2,0">
-                    <TextBlock x:Name="UpdatedText"
-                               Text="Local-only · waiting for first sync"
-                               VerticalAlignment="Center"
-                               FontFamily="{StaticResource UiFont}"
-                               FontSize="10"
-                               Foreground="{StaticResource TextSecondary}" />
-                    <TextBlock Text="always on top"
-                               HorizontalAlignment="Right"
-                               VerticalAlignment="Center"
-                               FontFamily="{StaticResource UiFont}"
-                               FontSize="10"
-                               Foreground="#657184" />
-                </Grid>
+            <Border Grid.Row="2" Margin="13,0,13,0" BorderBrush="#263344" BorderThickness="0,1,0,0">
+                <TextBlock x:Name="UpdatedText"
+                           Text="Local-only · waiting for sync"
+                           VerticalAlignment="Center"
+                           FontFamily="{StaticResource UiFont}"
+                           FontSize="7.5"
+                           Foreground="{StaticResource TextSecondary}" />
             </Border>
         </Grid>
     </Border>

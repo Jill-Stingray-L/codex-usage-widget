@@ -108,19 +108,6 @@ public partial class MainWindow : Window
         RenderWindow(primary, PrimaryLabel, PrimaryPercent, PrimaryProgress, PrimaryReset);
         PrimaryPanel.Visibility = Visibility.Visible;
 
-        if (snapshot.Windows.Count > 1)
-        {
-            var secondary = snapshot.Windows[1];
-            RenderWindow(secondary, SecondaryLabel, SecondaryPercent, SecondaryProgress, SecondaryReset);
-            SecondaryPanel.Visibility = Visibility.Visible;
-            SecondarySeparator.Visibility = Visibility.Visible;
-        }
-        else
-        {
-            SecondaryPanel.Visibility = Visibility.Collapsed;
-            SecondarySeparator.Visibility = Visibility.Collapsed;
-        }
-
         RemainingText.Text = $"{Math.Round(primary.RemainingPercent):0}%";
         UpdateUsageArc(primary.RemainingPercent);
         SetStatus(snapshot.PlanType is null ? "Live · ChatGPT" : $"Live · {snapshot.PlanType}", "#65D892");
@@ -152,8 +139,6 @@ public partial class MainWindow : Window
         PrimaryPercent.Text = string.Empty;
         PrimaryProgress.Value = 0;
         PrimaryReset.Text = message;
-        SecondaryPanel.Visibility = Visibility.Collapsed;
-        SecondarySeparator.Visibility = Visibility.Collapsed;
         UpdatedText.Text = "Local-only · click ↻ to retry";
         SetStatus("Offline", "#F07B7B");
         _trayIcon.Text = "Codex Usage · unavailable";
@@ -186,8 +171,8 @@ public partial class MainWindow : Window
     private void UpdateUsageArc(double remainingPercent)
     {
         var value = Math.Clamp(remainingPercent, 0d, 100d);
-        var center = new System.Windows.Point(71, 71);
-        const double radius = 65.5;
+        var center = new System.Windows.Point(33, 33);
+        const double radius = 29.5;
 
         UsageArc.Stroke = new SolidColorBrush(ColorForRemaining(value));
 
@@ -251,12 +236,29 @@ public partial class MainWindow : Window
         return $"{reset:ddd HH:mm}";
     }
 
-    private void Header_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    private void Widget_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        if (e.ButtonState == MouseButtonState.Pressed)
+        if (e.ButtonState != MouseButtonState.Pressed ||
+            e.OriginalSource is not DependencyObject source ||
+            FindAncestor<System.Windows.Controls.Button>(source) is not null)
         {
-            DragMove();
+            return;
         }
+
+        DragMove();
+    }
+
+    private static T? FindAncestor<T>(DependencyObject source) where T : DependencyObject
+    {
+        for (var current = source; current is not null; current = VisualTreeHelper.GetParent(current))
+        {
+            if (current is T match)
+            {
+                return match;
+            }
+        }
+
+        return null;
     }
 
     private async void RefreshButton_OnClick(object sender, RoutedEventArgs e) => await RefreshAsync();

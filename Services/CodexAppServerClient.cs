@@ -339,9 +339,18 @@ public sealed class CodexAppServerClient : IAsyncDisposable
         var limitName = ReadString(bucket, "limitName");
         planType ??= ReadString(bucket, "planType");
 
+        if (IsExcludedLimit(limitId, limitName))
+        {
+            return;
+        }
+
         AddWindow(bucket, "primary", limitId, limitName, destination);
         AddWindow(bucket, "secondary", limitId, limitName, destination);
     }
+
+    private static bool IsExcludedLimit(string limitId, string? limitName) =>
+        limitId.Contains("spark", StringComparison.OrdinalIgnoreCase) ||
+        (limitName?.Contains("spark", StringComparison.OrdinalIgnoreCase) ?? false);
 
     private static void AddWindow(
         JsonElement bucket,

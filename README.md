@@ -7,9 +7,10 @@ listens for `account/rateLimits/updated` notifications.
 ## What the prototype shows
 
 - Remaining percentage for the active Codex rate-limit window
-- Up to two returned usage windows, including used percentage and reset time
+- Main Codex usage window, including used percentage and reset time
+- Spark-specific buckets are intentionally excluded
 - Automatic refresh every two minutes and live refresh notifications
-- Always-on-top frameless widget with system-tray support
+- Compact always-on-top widget that can be dragged from any non-button surface
 - No token scraping, browser automation, or external backend
 
 ## Requirements
