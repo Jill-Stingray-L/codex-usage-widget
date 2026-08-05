@@ -17,7 +17,7 @@ public partial class TaskbarLabelWindow : Window
         SourceInitialized += (_, _) =>
         {
             _windowHandle = new WindowInteropHelper(this).Handle;
-            TaskbarWindowInterop.ConfigureAsNonActivatingToolWindow(_windowHandle);
+            TaskbarWindowInterop.ConfigureAsTaskbarOverlay(_windowHandle);
             Reposition();
         };
 
@@ -29,6 +29,8 @@ public partial class TaskbarLabelWindow : Window
     }
 
     public event EventHandler? OpenRequested;
+
+    public event EventHandler? ToggleRequested;
 
     public event EventHandler? RefreshRequested;
 
@@ -78,7 +80,7 @@ public partial class TaskbarLabelWindow : Window
     }
 
     private void LabelSurface_OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e) =>
-        OpenRequested?.Invoke(this, EventArgs.Empty);
+        ToggleRequested?.Invoke(this, EventArgs.Empty);
 
     private void OpenMenuItem_OnClick(object sender, RoutedEventArgs e) =>
         OpenRequested?.Invoke(this, EventArgs.Empty);

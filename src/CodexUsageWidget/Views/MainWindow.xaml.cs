@@ -16,6 +16,7 @@ public partial class MainWindow : Window
     private readonly DisplayModeStore _displayModeStore;
     private readonly TrayIconService _trayIcon;
     private readonly TaskbarLabelWindow _taskbarLabel = new();
+    private readonly WidgetVisibilityController _widgetVisibility;
     private WidgetDisplayMode _displayMode;
     private double _primaryUsedPercent;
     private bool _allowClose;
@@ -29,6 +30,7 @@ public partial class MainWindow : Window
         _displayModeStore = displayModeStore;
         _trayIcon = trayIcon;
         _displayMode = displayModeStore.Load();
+        _widgetVisibility = new WidgetVisibilityController(() => IsVisible, ShowWidget, Hide);
 
         InitializeComponent();
         PrimaryProgressTrack.SizeChanged += (_, _) => UpdatePrimaryProgressFill();
@@ -48,14 +50,16 @@ public partial class MainWindow : Window
         _usageMonitor.RefreshFailed += UsageMonitorOnRefreshFailed;
 
         _taskbarLabel.OpenRequested += (_, _) =>
-            Dispatcher.BeginInvoke(ShowWidget, DispatcherPriority.ApplicationIdle);
+            Dispatcher.BeginInvoke(_widgetVisibility.Show, DispatcherPriority.ApplicationIdle);
+        _taskbarLabel.ToggleRequested += (_, _) =>
+            Dispatcher.BeginInvoke(_widgetVisibility.Toggle, DispatcherPriority.ApplicationIdle);
         _taskbarLabel.RefreshRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => _ = _usageMonitor.RefreshAsync());
         _taskbarLabel.DesktopModeRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget));
         _taskbarLabel.ExitRequested += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
 
-        _trayIcon.OpenRequested += (_, _) => Dispatcher.BeginInvoke(ShowWidget);
+        _trayIcon.OpenRequested += (_, _) => Dispatcher.BeginInvoke(_widgetVisibility.Show);
         _trayIcon.RefreshRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => _ = _usageMonitor.RefreshAsync());
         _trayIcon.DesktopModeRequested += (_, _) =>

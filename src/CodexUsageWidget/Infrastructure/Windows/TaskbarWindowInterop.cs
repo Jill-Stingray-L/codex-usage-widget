@@ -5,19 +5,26 @@ namespace CodexUsageWidget.Infrastructure.Windows;
 public static class TaskbarWindowInterop
 {
     private const int GwlExStyle = -20;
+    private const int GwlHwndParent = -8;
     private const long WsExToolWindow = 0x00000080L;
     private const long WsExNoActivate = 0x08000000L;
     private const uint SwpNoActivate = 0x0010;
     private const uint SwpShowWindow = 0x0040;
     private static readonly IntPtr HwndTopmost = new(-1);
 
-    public static void ConfigureAsNonActivatingToolWindow(IntPtr windowHandle)
+    public static void ConfigureAsTaskbarOverlay(IntPtr windowHandle)
     {
         var extendedStyle = GetWindowLongPtr(windowHandle, GwlExStyle).ToInt64();
         SetWindowLongPtr(
             windowHandle,
             GwlExStyle,
             new IntPtr(extendedStyle | WsExToolWindow | WsExNoActivate));
+
+        var taskbar = FindWindow("Shell_TrayWnd", null);
+        if (taskbar != IntPtr.Zero)
+        {
+            EnsureOwnedByTaskbar(windowHandle, taskbar);
+        }
     }
 
     public static void PositionNextToNotificationArea(
@@ -30,6 +37,8 @@ public static class TaskbarWindowInterop
         {
             return;
         }
+
+        EnsureOwnedByTaskbar(windowHandle, taskbar);
 
         var tray = FindWindowEx(taskbar, IntPtr.Zero, "TrayNotifyWnd", null);
         var trayLeft = tray != IntPtr.Zero && GetWindowRect(tray, out var trayRect)
@@ -51,6 +60,14 @@ public static class TaskbarWindowInterop
             width,
             height,
             SwpNoActivate | SwpShowWindow);
+    }
+
+    private static void EnsureOwnedByTaskbar(IntPtr windowHandle, IntPtr taskbarHandle)
+    {
+        if (GetWindowLongPtr(windowHandle, GwlHwndParent) != taskbarHandle)
+        {
+            SetWindowLongPtr(windowHandle, GwlHwndParent, taskbarHandle);
+        }
     }
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
