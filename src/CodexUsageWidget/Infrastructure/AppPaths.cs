@@ -1,0 +1,14 @@
+using System.IO;
+
+namespace CodexUsageWidget.Infrastructure;
+
+public static class AppPaths
+{
+    public static string LocalDataDirectory => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "CodexUsageWidget");
+
+    public static string DisplayModeFile => Path.Combine(LocalDataDirectory, "display-mode.txt");
+
+    public static string LogDirectory => Path.Combine(LocalDataDirectory, "logs");
+}

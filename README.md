@@ -1,57 +1,97 @@
 # Codex Usage Widget
 
-A small, local-only Windows desktop widget for Codex subscription usage. It starts
-`codex app-server`, reads the official `account/rateLimits/read` response, and
-listens for `account/rateLimits/updated` notifications.
+A local-only Windows widget that shows the remaining Codex subscription allowance.
+It talks directly to the official Codex app server through
+`account/rateLimits/read` and listens for live `account/rateLimits/updated`
+notifications.
 
-## What the prototype shows
+> This is an independent utility and is not an official OpenAI application.
 
-- Remaining percentage for the active Codex rate-limit window
-- Main Codex usage window, including used percentage and reset time
-- Spark-specific buckets are intentionally excluded
-- Automatic refresh every two minutes and live refresh notifications
-- Compact always-on-top widget that can be dragged from any non-button surface
-- Persistent display choice between a desktop widget and a readable taskbar label
-- Taskbar label is aligned directly to the left of the Windows notification area
-- No token scraping, browser automation, or external backend
+## Features
+
+- Remaining percentage and reset time for the active Codex rate-limit window
+- Compact, movable, always-on-top desktop widget
+- Native-looking taskbar label beside the Windows notification area
+- Persistent desktop/taskbar display preference
+- Automatic refresh every two minutes and live server notifications
+- Single-instance protection to prevent overlapping labels
+- Per-monitor DPI support, local diagnostic logs, and graceful CLI reconnects
+- Spark-specific buckets intentionally excluded
+- No browser automation, token scraping, telemetry, or external backend
+
+## Requirements
+
+- Windows 10 version 1809 or newer
+- Codex CLI available on `PATH`
+- A completed local sign-in (`codex login`)
+
+The portable release includes the .NET runtime. A separate .NET installation is
+therefore not required on the destination computer.
+
+## Install on another computer
+
+1. Download the `codex-usage-widget-win-x64.zip` build artifact or create it with
+   `scripts/publish.ps1`.
+2. Extract the ZIP to a permanent directory.
+3. Ensure `codex --version` works in PowerShell and run `codex login` if needed.
+4. Start `CodexUsageWidget.exe`.
+
+Only one instance can run at a time. Starting the executable again exits quietly.
+
+If Codex is installed in a non-standard location, set
+`CODEX_USAGE_WIDGET_CODEX_PATH` to the full path of `codex.cmd` or `codex.exe`.
 
 ## Display modes
 
 - **Desktop widget** keeps the compact window visible and always on top.
-- **Taskbar label** hides the window and shows a native-looking `Codex 78%` label
-  directly beside the notification area. It has no permanent card or border and only
-  shows a subtle Windows-style background on hover. Left-click it to open the widget temporarily.
+- **Taskbar label** shows `Codex 75%` directly to the left of the notification area.
 
-Use the `−` button to switch to the taskbar label. Right-click the label and open
-**Display mode** to switch between modes. The small notification icon remains as a
-fallback lifecycle/menu entry, but the readable label is the primary taskbar UI.
+Use the `−` button to switch to taskbar mode. Right-click the taskbar label or tray
+icon to refresh, change display mode, or exit.
 
-## Requirements
+## Development
 
-- Windows 10 or newer
-- .NET 10 SDK or runtime
-- Codex CLI available on `PATH`
-- A local ChatGPT sign-in completed with `codex login`
-
-## Run
+The repository pins the .NET SDK in `global.json`.
 
 ```powershell
-dotnet run --project .\CodexUsageWidget.csproj
+dotnet restore .\CodexUsageWidget.slnx
+dotnet test .\CodexUsageWidget.slnx -c Release
+dotnet run --project .\src\CodexUsageWidget\CodexUsageWidget.csproj
 ```
 
-## Build
+Warnings are treated as errors and the recommended .NET analyzers run during every
+build.
+
+## Portable release
 
 ```powershell
-dotnet publish .\CodexUsageWidget.csproj `
-  -c Release `
-  -r win-x64 `
-  --self-contained false `
-  -p:PublishSingleFile=true
+.\scripts\publish.ps1 -Runtime win-x64
 ```
 
-The published executable will be under `bin\Release\net10.0-windows\win-x64\publish`.
+The script runs the complete test suite and creates:
 
-## Notes
+```text
+artifacts/release/codex-usage-widget-win-x64.zip
+```
 
-This is subscription-limit visibility, not OpenAI API billing. API-key usage has
-different accounting and would need a separate data source and UI mode.
+`win-arm64` is also supported through the script's `-Runtime` parameter.
+
+## Local data
+
+The application only writes under `%LOCALAPPDATA%\CodexUsageWidget`:
+
+- `display-mode.txt` — the selected display mode
+- `logs\codex-usage-widget-YYYYMMDD.log` — diagnostics, retained for 14 days
+
+No credentials are read or stored by the widget. Authentication remains owned by
+the locally installed Codex CLI.
+
+## Architecture
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for component boundaries,
+runtime flow, and extension guidance.
+
+## Usage semantics
+
+This displays ChatGPT/Codex subscription rate limits. It does not display OpenAI
+API billing or API-key usage, which use a different accounting system.

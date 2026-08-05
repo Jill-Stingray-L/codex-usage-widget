@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="src/CodexUsageWidget/CodexUsageWidget.csproj" />
+  <Project Path="tests/CodexUsageWidget.Tests/CodexUsageWidget.Tests.csproj" />
+</Solution>
