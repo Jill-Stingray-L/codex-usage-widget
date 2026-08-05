@@ -16,6 +16,7 @@ public partial class MainWindow : Window
     private readonly CodexAppServerClient _client = new();
     private readonly DispatcherTimer _refreshTimer;
     private readonly Forms.NotifyIcon _trayIcon;
+    private readonly TaskbarLabelWindow _taskbarLabel;
     private Forms.ToolStripMenuItem? _desktopWidgetModeItem;
     private Forms.ToolStripMenuItem? _taskbarIndicatorModeItem;
     private System.Drawing.Icon? _generatedTrayIcon;
@@ -28,6 +29,13 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+
+        _taskbarLabel = new TaskbarLabelWindow();
+        _taskbarLabel.OpenRequested += (_, _) => Dispatcher.Invoke(ShowWidget);
+        _taskbarLabel.RefreshRequested += (_, _) => Dispatcher.InvokeAsync(RefreshAsync);
+        _taskbarLabel.DesktopModeRequested += (_, _) =>
+            Dispatcher.Invoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget));
+        _taskbarLabel.ExitRequested += (_, _) => Dispatcher.Invoke(ExitApplication);
 
         _client.RateLimitsChanged += (_, _) => Dispatcher.InvokeAsync(RefreshAsync);
         _client.DiagnosticMessage += (_, message) => System.Diagnostics.Debug.WriteLine(message);
@@ -55,7 +63,7 @@ public partial class MainWindow : Window
             null,
             (_, _) => Dispatcher.Invoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget)));
         _taskbarIndicatorModeItem = new Forms.ToolStripMenuItem(
-            "Taskbar indicator",
+            "Taskbar label",
             null,
             (_, _) => Dispatcher.Invoke(() => SetDisplayMode(WidgetDisplayMode.TaskbarIndicator)));
         displayModeMenu.DropDownItems.Add(_desktopWidgetModeItem);
@@ -86,6 +94,10 @@ public partial class MainWindow : Window
     private async void MainWindow_OnLoaded(object sender, RoutedEventArgs e)
     {
         PositionNearWorkAreaEdge();
+        if (_displayMode == WidgetDisplayMode.TaskbarIndicator)
+        {
+            _taskbarLabel.ShowLabel();
+        }
         _refreshTimer.Start();
         await RefreshAsync();
     }
@@ -144,6 +156,7 @@ public partial class MainWindow : Window
         UpdatedText.Text = $"Local-only · updated {snapshot.FetchedAt:HH:mm:ss}";
         _trayIcon.Text = $"Codex · {Math.Round(primary.RemainingPercent):0}% remaining";
         UpdateTrayUsageIcon(primary.RemainingPercent);
+        _taskbarLabel.UpdateUsage(primary.RemainingPercent, primary.ResetsAt);
     }
 
     private static void RenderWindow(
@@ -173,6 +186,7 @@ public partial class MainWindow : Window
         SetStatus("Offline", "#F07B7B");
         _trayIcon.Text = "Codex Usage · unavailable";
         UpdateTrayUsageIcon(null);
+        _taskbarLabel.UpdateUsage(null, null);
     }
 
     private static string ToFriendlyError(string message)
@@ -269,10 +283,12 @@ public partial class MainWindow : Window
 
         if (mode == WidgetDisplayMode.DesktopWidget)
         {
+            _taskbarLabel.HideLabel();
             ShowWidget();
         }
         else
         {
+            _taskbarLabel.ShowLabel();
             Hide();
         }
     }
@@ -412,6 +428,8 @@ public partial class MainWindow : Window
         }
 
         _refreshTimer.Stop();
+        _taskbarLabel.HideLabel();
+        _taskbarLabel.Close();
         _trayIcon.Visible = false;
         _trayIcon.Dispose();
         _generatedTrayIcon?.Dispose();

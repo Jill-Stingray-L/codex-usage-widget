@@ -11,20 +11,19 @@ listens for `account/rateLimits/updated` notifications.
 - Spark-specific buckets are intentionally excluded
 - Automatic refresh every two minutes and live refresh notifications
 - Compact always-on-top widget that can be dragged from any non-button surface
-- Persistent display choice between a desktop widget and a taskbar notification-area indicator
-- Dynamic taskbar icon showing the remaining percentage; click it to open the widget
+- Persistent display choice between a desktop widget and a readable taskbar label
+- Taskbar label is aligned directly to the left of the Windows notification area
 - No token scraping, browser automation, or external backend
 
 ## Display modes
 
 - **Desktop widget** keeps the compact window visible and always on top.
-- **Taskbar indicator** hides the window and shows the remaining percentage in the
-  notification area. Left-click the indicator to open the widget temporarily.
+- **Taskbar label** hides the window and shows a readable `Codex · 78% left` label
+  directly beside the notification area. Left-click the label to open the widget temporarily.
 
-Use the `−` button to switch to the taskbar indicator. Right-click the taskbar
-indicator and open **Display mode** to switch between modes. Windows may initially
-place the icon inside the system-tray overflow; the user controls whether it stays
-visible directly on the taskbar.
+Use the `−` button to switch to the taskbar label. Right-click the label and open
+**Display mode** to switch between modes. The small notification icon remains as a
+fallback lifecycle/menu entry, but the readable label is the primary taskbar UI.
 
 ## Requirements
 
