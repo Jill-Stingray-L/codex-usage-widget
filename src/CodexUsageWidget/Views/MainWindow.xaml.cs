@@ -81,7 +81,7 @@ public partial class MainWindow : Window
     }
 
     private void UsageMonitorOnRefreshStarted() =>
-        Dispatcher.BeginInvoke(() => SetStatus("Syncing…", "#E6A85A"));
+        Dispatcher.BeginInvoke(() => SetStatus("Syncing…", "#D6A15F"));
 
     private void UsageMonitorOnSnapshotUpdated(UsageSnapshot snapshot) =>
         Dispatcher.BeginInvoke(() => RenderSnapshot(snapshot));
@@ -100,8 +100,8 @@ public partial class MainWindow : Window
         RenderUsageWindow(primary);
         PrimaryPanel.Visibility = Visibility.Visible;
         RemainingText.Text = $"{Math.Round(primary.RemainingPercent):0}%";
-        SetStatus(snapshot.PlanType is null ? "Live · ChatGPT" : $"Live · {snapshot.PlanType}", "#65D892");
-        UpdatedText.Text = $"Local-only · updated {snapshot.FetchedAt:HH:mm:ss}";
+        SetStatus(snapshot.PlanType is null ? "Live · ChatGPT" : $"Live · {snapshot.PlanType}", "#68B88A");
+        UpdatedText.Text = $"Local only · updated {snapshot.FetchedAt:HH:mm:ss}";
         _trayIcon.UpdateUsage(primary.RemainingPercent);
         _taskbarLabel.UpdateUsage(primary.RemainingPercent, primary.ResetsAt);
     }
@@ -127,8 +127,8 @@ public partial class MainWindow : Window
         _primaryUsedPercent = 0;
         UpdatePrimaryProgressFill();
         PrimaryReset.Text = message;
-        UpdatedText.Text = "Local-only · click ↻ to retry";
-        SetStatus("Offline", "#F07B7B");
+        UpdatedText.Text = "Local only · select refresh to retry";
+        SetStatus("Offline", "#E16D76");
         _trayIcon.UpdateUsage(null);
         _taskbarLabel.UpdateUsage(null, null);
     }

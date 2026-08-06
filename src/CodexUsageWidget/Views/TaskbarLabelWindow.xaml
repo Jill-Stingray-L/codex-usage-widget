@@ -10,9 +10,11 @@
         ShowInTaskbar="False"
         ShowActivated="False"
         Topmost="True"
-        Focusable="False">
+        Focusable="False"
+        SnapsToDevicePixels="True"
+        UseLayoutRounding="True">
     <Border x:Name="LabelSurface"
-            CornerRadius="4"
+            CornerRadius="6"
             Cursor="Hand"
             ToolTipService.Placement="Top"
             ToolTipService.VerticalOffset="-8"
@@ -22,7 +24,7 @@
                 <Setter Property="Background" Value="#01000000" />
                 <Style.Triggers>
                     <Trigger Property="IsMouseOver" Value="True">
-                        <Setter Property="Background" Value="#20FFFFFF" />
+                        <Setter Property="Background" Value="#18FFFFFF" />
                     </Trigger>
                 </Style.Triggers>
             </Style>
@@ -37,18 +39,30 @@
                 <MenuItem Header="Exit" Click="ExitMenuItem_OnClick" />
             </ContextMenu>
         </Border.ContextMenu>
-        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center">
-            <TextBlock Text="Codex"
-                       FontFamily="Segoe UI Variable Display, Segoe UI"
-                       FontSize="12"
-                       Foreground="#E7E7E7" />
-            <TextBlock x:Name="UsageText"
-                       Margin="5,0,0,0"
-                       Text="--%"
-                       FontFamily="Segoe UI Variable Display, Segoe UI"
-                       FontSize="12"
-                       FontWeight="SemiBold"
-                       Foreground="#FFFFFF" />
-        </StackPanel>
+        <TextBlock HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   FontFamily="Segoe UI Variable Text, Segoe UI"
+                   FontSize="12"
+                   TextOptions.TextFormattingMode="Ideal">
+            <InlineUIContainer BaselineAlignment="Center">
+                <Ellipse Width="3"
+                         Height="3"
+                         Margin="0,0,6,0"
+                         Fill="#D8D8D8">
+                    <Ellipse.RenderTransform>
+                        <TranslateTransform Y="1" />
+                    </Ellipse.RenderTransform>
+                </Ellipse>
+            </InlineUIContainer><Run
+                Text="Codex"
+                FontWeight="Medium"
+                Foreground="#F2F2F2" /><Run
+                Text=" " /><Run
+                x:Name="UsageText"
+                Text="--%"
+                FontWeight="SemiBold"
+                Typography.NumeralAlignment="Tabular"
+                Foreground="#D4D4D4" />
+        </TextBlock>
     </Border>
 </Window>

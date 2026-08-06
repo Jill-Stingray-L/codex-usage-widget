@@ -22,9 +22,9 @@ public sealed class UsageTextFormatterTests
     }
 
     [Theory]
-    [InlineData(10, "#F07070")]
-    [InlineData(25, "#F0B35E")]
-    [InlineData(26, "#65D892")]
+    [InlineData(10, "#E16D76")]
+    [InlineData(25, "#DDA56D")]
+    [InlineData(26, "#E7E7E7")]
     public void ColorForRemainingUsesThresholds(double remaining, string expected) =>
         Assert.Equal(expected, UsageTextFormatter.ColorForRemaining(remaining));
 }

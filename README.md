@@ -7,6 +7,8 @@ notifications.
 
 > This is an independent utility and is not an official OpenAI application.
 
+![Codex Usage Widget desktop preview](docs/images/desktop-widget.png)
+
 ## Features
 
 - Remaining percentage and reset time for the active Codex rate-limit window
@@ -51,6 +53,8 @@ If Codex is installed in a non-standard location, set
 
 - **Desktop widget** keeps the compact window visible and always on top.
 - **Taskbar label** shows `Codex 75%` directly to the left of the notification area.
+
+![Codex Usage Widget taskbar label preview](docs/images/taskbar-label.png)
 
 Use the `−` button to switch to taskbar mode. Right-click the taskbar label or tray
 icon to refresh, change display mode, or exit.

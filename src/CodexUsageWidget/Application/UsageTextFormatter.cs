@@ -37,8 +37,8 @@ public static class UsageTextFormatter
 
     public static string ColorForRemaining(double remainingPercent) => remainingPercent switch
     {
-        <= 10 => "#F07070",
-        <= 25 => "#F0B35E",
-        _ => "#65D892"
+        <= 10 => "#E16D76",
+        <= 25 => "#DDA56D",
+        _ => "#E7E7E7"
     };
 }
