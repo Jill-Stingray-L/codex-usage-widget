@@ -1,0 +1,49 @@
+<UserControl x:Class="CodexUsageWidget.Views.Controls.CompactUsageView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:CodexUsageWidget.Views.Controls">
+    <Grid Margin="17,4,17,8">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="150" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+            <StackPanel>
+                <TextBlock Text="{Binding HeadlineRemainingText}"
+                           FontFamily="{StaticResource UiFont}"
+                           FontSize="34"
+                           FontWeight="SemiBold"
+                           Typography.NumeralAlignment="Tabular"
+                           Foreground="{StaticResource TextPrimary}" />
+                <TextBlock Text="{Binding HeadlineLabel}"
+                           Margin="1,-5,0,0"
+                           Style="{StaticResource SupportingText}" />
+            </StackPanel>
+            <TextBlock Grid.Column="1"
+                       Text="{Binding WarningText}"
+                       Visibility="{Binding HasWarning, Converter={StaticResource BooleanToVisibilityConverter}}"
+                       VerticalAlignment="Center"
+                       Padding="10,7"
+                       TextWrapping="Wrap"
+                       Style="{StaticResource SupportingText}"
+                       Foreground="#E6B47D"
+                       Background="#24DDA56D" />
+        </Grid>
+
+        <ItemsControl Grid.Row="1"
+                      Margin="0,7,0,0"
+                      ItemsSource="{Binding GeneralLimits}">
+            <ItemsControl.ItemTemplate>
+                <DataTemplate>
+                    <controls:UsageLimitRow />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </Grid>
+</UserControl>

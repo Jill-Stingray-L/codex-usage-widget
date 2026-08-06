@@ -33,13 +33,14 @@ public partial class App : System.Windows.Application, IDisposable
 
         try
         {
-            var usageProvider = new CodexAppServerClient();
+            var usageProvider = new CodexUsageProvider(new CodexAppServerSession());
             var usageMonitor = new UsageMonitor(usageProvider);
             usageMonitor.DiagnosticMessage += (_, message) => _logger.Info(message);
 
             var window = new MainWindow(
                 usageMonitor,
                 new DisplayModeStore(),
+                new WidgetDensityStore(),
                 new TrayIconService());
             MainWindow = window;
             window.Show();

@@ -11,7 +11,9 @@ notifications.
 
 ## Features
 
-- Remaining percentage and reset time for the active Codex rate-limit window
+- Remaining percentage and reset time for every general Codex rate-limit window
+- Compact and detailed widget layouts with optional token-activity history
+- Credit, spend-control, earned-reset, and model-specific limit details when available
 - Compact, movable, always-on-top desktop widget
 - Native-looking taskbar label beside the Windows notification area
 - Immediate taskbar-label hiding while another app is fullscreen on the same monitor
@@ -19,7 +21,7 @@ notifications.
 - Automatic refresh every two minutes and live server notifications
 - Single-instance protection to prevent overlapping labels
 - Per-monitor DPI support, local diagnostic logs, and graceful CLI reconnects
-- Spark-specific buckets intentionally excluded
+- Model-specific buckets stay out of the compact view and appear only in details
 - No browser automation, token scraping, telemetry, or external backend
 
 ## Requirements
@@ -51,8 +53,19 @@ If Codex is installed in a non-standard location, set
 
 ## Display modes
 
-- **Desktop widget** keeps the compact window visible and always on top.
+- **Desktop widget** keeps the selected widget layout visible and always on top.
 - **Taskbar label** shows `Codex 75%` directly to the left of the notification area.
+
+The desktop widget has two persisted layouts:
+
+- **Compact** shows the general Codex windows and highlights the most constrained one.
+- **Details** adds available credits and spend controls, token activity, earned resets,
+  and model-specific limits such as GPT-5.3-Codex-Spark.
+
+![Codex Usage Widget detailed preview](docs/images/detailed-widget.png)
+
+Token activity is informational and is intentionally presented separately from quota
+consumption because tokens do not map linearly to the remaining subscription percentage.
 
 ![Codex Usage Widget taskbar label preview](docs/images/taskbar-label.png)
 
@@ -94,6 +107,7 @@ Maintainer release instructions are documented in
 The application only writes under `%LOCALAPPDATA%\CodexUsageWidget`:
 
 - `display-mode.txt` — the selected display mode
+- `widget-density.txt` — the selected compact or detailed widget layout
 - `logs\codex-usage-widget-YYYYMMDD.log` — diagnostics, retained for 14 days
 
 No credentials are read or stored by the widget. Authentication remains owned by

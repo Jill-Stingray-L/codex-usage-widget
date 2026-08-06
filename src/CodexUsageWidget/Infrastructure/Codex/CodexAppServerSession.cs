@@ -1,28 +1,24 @@
 using System.Text.Json;
-using CodexUsageWidget.Application;
-using CodexUsageWidget.Domain;
 
 namespace CodexUsageWidget.Infrastructure.Codex;
 
-public sealed class CodexAppServerClient : IUsageProvider
+public sealed class CodexAppServerSession : ICodexAppServerSession
 {
     private readonly SemaphoreSlim _startLock = new(1, 1);
     private JsonRpcConnection? _connection;
     private bool _disposed;
 
-    public event EventHandler? RateLimitsChanged;
+    public event EventHandler<string>? NotificationReceived;
 
     public event EventHandler<string>? DiagnosticMessage;
 
-    public async Task<UsageSnapshot> ReadUsageAsync(CancellationToken cancellationToken = default)
+    public async Task<JsonElement> RequestAsync(
+        string method,
+        object? parameters,
+        CancellationToken cancellationToken)
     {
         var connection = await GetConnectionAsync(cancellationToken).ConfigureAwait(false);
-        var result = await connection.RequestAsync(
-                "account/rateLimits/read",
-                parameters: null,
-                cancellationToken)
-            .ConfigureAwait(false);
-        return CodexUsageParser.Parse(result);
+        return await connection.RequestAsync(method, parameters, cancellationToken).ConfigureAwait(false);
     }
 
     private async Task<JsonRpcConnection> GetConnectionAsync(CancellationToken cancellationToken)
@@ -85,7 +81,10 @@ public sealed class CodexAppServerClient : IUsageProvider
                     {
                         name = "codex_usage_widget",
                         title = "Codex Usage Widget",
-                        version = "1.0.0"
+                        version = typeof(CodexAppServerSession).Assembly
+                            .GetName()
+                            .Version?
+                            .ToString(3) ?? "unknown"
                     },
                     capabilities = new
                     {
@@ -98,13 +97,8 @@ public sealed class CodexAppServerClient : IUsageProvider
         await connection.NotifyAsync("initialized", new { }, cancellationToken).ConfigureAwait(false);
     }
 
-    private void ConnectionOnNotificationReceived(object? sender, string method)
-    {
-        if (method == "account/rateLimits/updated")
-        {
-            RateLimitsChanged?.Invoke(this, EventArgs.Empty);
-        }
-    }
+    private void ConnectionOnNotificationReceived(object? sender, string method) =>
+        NotificationReceived?.Invoke(this, method);
 
     private void ConnectionOnDiagnosticMessage(object? sender, string message) =>
         DiagnosticMessage?.Invoke(this, message);

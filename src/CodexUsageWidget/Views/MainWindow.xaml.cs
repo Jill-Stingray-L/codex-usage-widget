@@ -7,33 +7,45 @@ using CodexUsageWidget.Application;
 using CodexUsageWidget.Domain;
 using CodexUsageWidget.Infrastructure.Settings;
 using CodexUsageWidget.Infrastructure.Windows;
+using CodexUsageWidget.Views.ViewModels;
 
 namespace CodexUsageWidget.Views;
 
 public partial class MainWindow : Window
 {
+    private const double CompactBaseHeight = 236d;
+    private const double CompactLimitRowHeight = 56d;
+    private const double CompactMaximumHeight = 292d;
+    private const double DetailedHeight = 620d;
+
     private readonly UsageMonitor _usageMonitor;
     private readonly DisplayModeStore _displayModeStore;
+    private readonly WidgetDensityStore _densityStore;
     private readonly TrayIconService _trayIcon;
     private readonly TaskbarLabelWindow _taskbarLabel = new();
     private readonly WidgetVisibilityController _widgetVisibility;
     private WidgetDisplayMode _displayMode;
-    private double _primaryUsedPercent;
+    private WidgetDensity _density;
+    private UsageWidgetViewModel _viewModel = UsageWidgetViewModel.Loading();
     private bool _allowClose;
 
     public MainWindow(
         UsageMonitor usageMonitor,
         DisplayModeStore displayModeStore,
+        WidgetDensityStore densityStore,
         TrayIconService trayIcon)
     {
         _usageMonitor = usageMonitor;
         _displayModeStore = displayModeStore;
+        _densityStore = densityStore;
         _trayIcon = trayIcon;
         _displayMode = displayModeStore.Load();
+        _density = densityStore.Load();
         _widgetVisibility = new WidgetVisibilityController(() => IsVisible, ShowWidget, Hide);
 
         InitializeComponent();
-        PrimaryProgressTrack.SizeChanged += (_, _) => UpdatePrimaryProgressFill();
+        DataContext = _viewModel;
+        ApplyDensity(repositionBottomEdge: false);
         WireEvents();
     }
 
@@ -81,7 +93,7 @@ public partial class MainWindow : Window
     }
 
     private void UsageMonitorOnRefreshStarted() =>
-        Dispatcher.BeginInvoke(() => SetStatus("Syncing…", "#D6A15F"));
+        Dispatcher.BeginInvoke(() => SetViewModel(_viewModel.Syncing()));
 
     private void UsageMonitorOnSnapshotUpdated(UsageSnapshot snapshot) =>
         Dispatcher.BeginInvoke(() => RenderSnapshot(snapshot));
@@ -91,61 +103,83 @@ public partial class MainWindow : Window
 
     private void RenderSnapshot(UsageSnapshot snapshot)
     {
-        if (snapshot.Primary is not { } primary)
+        var nextViewModel = UsageWidgetViewModel.FromSnapshot(snapshot);
+        SetViewModel(nextViewModel);
+        if (_density == WidgetDensity.Detailed)
         {
-            RenderError("No subscription limits returned. Run codex login first.");
-            return;
+            DetailedView.ScrollToTop();
+        }
+        else
+        {
+            ApplyDensity(repositionBottomEdge: true);
         }
 
-        RenderUsageWindow(primary);
-        PrimaryPanel.Visibility = Visibility.Visible;
-        RemainingText.Text = $"{Math.Round(primary.RemainingPercent):0}%";
-        SetStatus(snapshot.PlanType is null ? "Live · ChatGPT" : $"Live · {snapshot.PlanType}", "#68B88A");
-        UpdatedText.Text = $"Local only · updated {snapshot.FetchedAt:HH:mm:ss}";
-        _trayIcon.UpdateUsage(primary.RemainingPercent);
-        _taskbarLabel.UpdateUsage(primary.RemainingPercent, primary.ResetsAt);
-    }
-
-    private void RenderUsageWindow(UsageWindow window)
-    {
-        PrimaryLabel.Text = window.Label;
-        PrimaryPercent.Text = $"{Math.Round(window.UsedPercent):0}% used";
-        _primaryUsedPercent = Math.Clamp(window.UsedPercent, 0d, 100d);
-        PrimaryProgressFill.Background = BrushFromHex(
-            UsageTextFormatter.ColorForRemaining(window.RemainingPercent));
-        UpdatePrimaryProgressFill();
-        PrimaryReset.Text = window.ResetsAt is null
-            ? "Reset time unavailable"
-            : $"Resets {UsageTextFormatter.FormatReset(window.ResetsAt.Value)}";
+        _trayIcon.UpdateUsage(nextViewModel.HeadlineRemainingPercent);
+        _taskbarLabel.UpdateUsage(
+            nextViewModel.HeadlineRemainingPercent,
+            nextViewModel.HeadlineResetsAt);
     }
 
     private void RenderError(string message)
     {
-        RemainingText.Text = "--%";
-        PrimaryLabel.Text = "Usage unavailable";
-        PrimaryPercent.Text = string.Empty;
-        _primaryUsedPercent = 0;
-        UpdatePrimaryProgressFill();
-        PrimaryReset.Text = message;
-        UpdatedText.Text = "Local only · select refresh to retry";
-        SetStatus("Offline", "#E16D76");
+        SetViewModel(UsageWidgetViewModel.Error(message));
         _trayIcon.UpdateUsage(null);
         _taskbarLabel.UpdateUsage(null, null);
     }
 
-    private void SetStatus(string text, string color)
+    private void SetViewModel(UsageWidgetViewModel viewModel)
     {
-        StatusText.Text = text;
-        StatusDot.Fill = BrushFromHex(color);
+        _viewModel = viewModel;
+        DataContext = viewModel;
     }
 
-    private static SolidColorBrush BrushFromHex(string color) =>
-        new((System.Windows.Media.Color)System.Windows.Media.ColorConverter.ConvertFromString(color));
-
-    private void UpdatePrimaryProgressFill()
+    private void ApplyDensity(bool repositionBottomEdge)
     {
-        PrimaryProgressFill.Width = Math.Max(0d, PrimaryProgressTrack.ActualWidth) *
-                                    (_primaryUsedPercent / 100d);
+        var previousBottom = IsLoaded ? Top + ActualHeight : 0d;
+        var workArea = SystemParameters.WorkArea;
+        var desiredHeight = _density == WidgetDensity.Detailed
+            ? Math.Min(DetailedHeight, Math.Max(CompactMaximumHeight, workArea.Height - 40d))
+            : CalculateCompactHeight();
+
+        MinHeight = desiredHeight;
+        Height = desiredHeight;
+        CompactView.Visibility = _density == WidgetDensity.Compact
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        DetailedView.Visibility = _density == WidgetDensity.Detailed
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        DensityGlyphRotation.Angle = _density == WidgetDensity.Detailed ? 180d : 0d;
+        DensityButton.ToolTip = _density == WidgetDensity.Detailed
+            ? "Show compact view"
+            : "Show details";
+
+        if (_density == WidgetDensity.Detailed)
+        {
+            DetailedView.ScrollToTop();
+        }
+
+        if (repositionBottomEdge && IsLoaded)
+        {
+            Top = Math.Clamp(previousBottom - desiredHeight, workArea.Top, workArea.Bottom - desiredHeight);
+        }
+    }
+
+    private double CalculateCompactHeight()
+    {
+        var additionalRows = Math.Max(0, _viewModel.GeneralLimits.Count - 1);
+        return Math.Min(
+            CompactMaximumHeight,
+            CompactBaseHeight + additionalRows * CompactLimitRowHeight);
+    }
+
+    private void ToggleDensity()
+    {
+        _density = _density == WidgetDensity.Compact
+            ? WidgetDensity.Detailed
+            : WidgetDensity.Compact;
+        _densityStore.Save(_density);
+        ApplyDensity(repositionBottomEdge: true);
     }
 
     private void PositionNearWorkAreaEdge()
@@ -160,6 +194,10 @@ public partial class MainWindow : Window
         Show();
         WindowState = WindowState.Normal;
         Activate();
+        if (_density == WidgetDensity.Detailed)
+        {
+            DetailedView.ScrollToTop();
+        }
     }
 
     private void SetDisplayMode(WidgetDisplayMode mode)
@@ -206,6 +244,8 @@ public partial class MainWindow : Window
 
     private async void RefreshButton_OnClick(object sender, RoutedEventArgs e) =>
         await _usageMonitor.RefreshAsync();
+
+    private void DensityButton_OnClick(object sender, RoutedEventArgs e) => ToggleDensity();
 
     private void HideButton_OnClick(object sender, RoutedEventArgs e) =>
         SetDisplayMode(WidgetDisplayMode.TaskbarIndicator);
