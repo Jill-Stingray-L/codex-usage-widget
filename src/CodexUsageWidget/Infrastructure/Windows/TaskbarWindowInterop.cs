@@ -9,7 +9,6 @@ public static class TaskbarWindowInterop
     private const long WsExToolWindow = 0x00000080L;
     private const long WsExNoActivate = 0x08000000L;
     private const uint SwpNoActivate = 0x0010;
-    private const uint SwpShowWindow = 0x0040;
     private static readonly IntPtr HwndTopmost = new(-1);
 
     public static void ConfigureAsTaskbarOverlay(IntPtr windowHandle)
@@ -59,7 +58,7 @@ public static class TaskbarWindowInterop
             top,
             width,
             height,
-            SwpNoActivate | SwpShowWindow);
+            SwpNoActivate);
     }
 
     private static void EnsureOwnedByTaskbar(IntPtr windowHandle, IntPtr taskbarHandle)

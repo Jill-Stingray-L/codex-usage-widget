@@ -12,6 +12,7 @@ notifications.
 - Remaining percentage and reset time for the active Codex rate-limit window
 - Compact, movable, always-on-top desktop widget
 - Native-looking taskbar label beside the Windows notification area
+- Immediate taskbar-label hiding while another app is fullscreen on the same monitor
 - Persistent desktop/taskbar display preference
 - Automatic refresh every two minutes and live server notifications
 - Single-instance protection to prevent overlapping labels

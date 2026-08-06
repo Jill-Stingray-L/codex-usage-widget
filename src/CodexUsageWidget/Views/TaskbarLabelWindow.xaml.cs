@@ -5,10 +5,17 @@ using CodexUsageWidget.Infrastructure.Windows;
 
 namespace CodexUsageWidget.Views;
 
+[System.Diagnostics.CodeAnalysis.SuppressMessage(
+    "Design",
+    "CA1001:Types that own disposable fields should be disposable",
+    Justification = "WPF owns the window lifecycle; the Closed handler releases the native hooks.")]
 public partial class TaskbarLabelWindow : Window
 {
     private readonly System.Windows.Threading.DispatcherTimer _positionTimer;
+    private readonly WindowChangeWatcher _windowChangeWatcher;
     private IntPtr _windowHandle;
+    private bool _labelRequested;
+    private int _visibilityUpdateQueued;
 
     public TaskbarLabelWindow()
     {
@@ -25,7 +32,10 @@ public partial class TaskbarLabelWindow : Window
         {
             Interval = TimeSpan.FromSeconds(2)
         };
-        _positionTimer.Tick += (_, _) => Reposition();
+        _positionTimer.Tick += (_, _) => UpdateVisibilityAndPosition();
+
+        _windowChangeWatcher = new WindowChangeWatcher(QueueVisibilityUpdate);
+        Closed += (_, _) => _windowChangeWatcher.Dispose();
     }
 
     public event EventHandler? OpenRequested;
@@ -42,17 +52,15 @@ public partial class TaskbarLabelWindow : Window
 
     public void ShowLabel()
     {
-        if (!IsVisible)
-        {
-            Show();
-        }
-
+        _labelRequested = true;
+        new WindowInteropHelper(this).EnsureHandle();
         _positionTimer.Start();
-        Reposition();
+        UpdateVisibilityAndPosition();
     }
 
     public void HideLabel()
     {
+        _labelRequested = false;
         _positionTimer.Stop();
         Hide();
     }
@@ -75,10 +83,53 @@ public partial class TaskbarLabelWindow : Window
 
     private void Reposition()
     {
-        if (_windowHandle != IntPtr.Zero && IsVisible)
+        if (_windowHandle != IntPtr.Zero)
         {
             TaskbarWindowInterop.PositionNextToNotificationArea(_windowHandle, Width, Height);
         }
+    }
+
+    private void UpdateVisibilityAndPosition()
+    {
+        if (!_labelRequested || _windowHandle == IntPtr.Zero)
+        {
+            return;
+        }
+
+        if (FullscreenWindowDetector.IsForegroundWindowFullscreenOnMonitor(_windowHandle))
+        {
+            if (IsVisible)
+            {
+                Hide();
+            }
+
+            return;
+        }
+
+        if (!IsVisible)
+        {
+            Reposition();
+            Show();
+            return;
+        }
+
+        Reposition();
+    }
+
+    private void QueueVisibilityUpdate()
+    {
+        if (Interlocked.Exchange(ref _visibilityUpdateQueued, 1) != 0)
+        {
+            return;
+        }
+
+        Dispatcher.BeginInvoke(
+            () =>
+            {
+                Interlocked.Exchange(ref _visibilityUpdateQueued, 0);
+                UpdateVisibilityAndPosition();
+            },
+            System.Windows.Threading.DispatcherPriority.Send);
     }
 
     private void LabelSurface_OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e) =>
