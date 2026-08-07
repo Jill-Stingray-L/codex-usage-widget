@@ -73,10 +73,37 @@ consumption because tokens do not map linearly to the remaining subscription per
 Use the `−` button to switch to taskbar mode. Right-click the taskbar label or tray
 icon to refresh, change display mode, or exit.
 
-## Codex activity hooks
+## Live Codex activity dots
 
-The taskbar dots can react to real Codex work without polling. Hook installation remains
-an explicit, reviewable action and is never performed during normal widget startup.
+Activity dots turn the official local Codex lifecycle hooks into an at-a-glance signal
+that work is still running. They are available in both the taskbar label and desktop
+widget, without polling Codex or estimating activity from rate-limit changes.
+
+### What activity dots provide
+
+- One quiet dot while Codex is idle, expanding into a three-dot wave during active work
+- Immediate, event-driven updates when a Codex turn starts or finishes
+- Independent tracking of parallel turns, so one completed turn cannot hide another
+  turn that is still running
+- A completion animation only after the final active turn finishes
+- A temporary taskbar preview for checking the animation without changing saved settings
+- A dedicated setup window for installation status, trust approval, refresh, and removal
+
+### Private and local by design
+
+- No prompts, responses, transcript contents, transcript paths, or model output are
+  collected, stored, forwarded, or logged
+- No telemetry, analytics, browser automation, remote backend, or credential access is used
+- Hook signals stay on the current Windows account through a current-user-only named pipe
+- Only the lifecycle event type and the Codex-provided session and turn identifiers are
+  passed to the in-memory activity monitor
+- Activity state is not persisted, so the widget does not build a history of your work
+- Authentication remains entirely owned by the locally installed Codex CLI
+
+Hook installation remains an explicit, reviewable action and is never performed during
+normal widget startup.
+
+### Setup and removal
 
 Select the three-dot activity button in the desktop widget, or choose **Activity dots...**
 from the tray or taskbar-label menu. The setup window reports whether the hooks are missing,
@@ -108,10 +135,8 @@ To perform the equivalent removal from PowerShell, run:
 .\CodexUsageWidget.exe --uninstall-activity-hooks
 ```
 
-The hook handler sends only an activity kind, session ID, and turn ID over a local
-current-user named pipe. Prompts, assistant messages, transcript paths, and model
-output are neither forwarded nor logged. If the widget is closed, the handler exits
-successfully after a short bounded connection attempt and Codex continues normally.
+If the widget is closed, the hook handler exits successfully after a short bounded
+connection attempt and Codex continues normally.
 
 Activity state is intentionally in memory only. A task that started before the widget
 or hooks were ready is not reconstructed. If Codex terminates without emitting `Stop`
