@@ -15,9 +15,7 @@
     <Description>Local Windows widget for Codex subscription usage.</Description>
     <RepositoryUrl>https://github.com/ognjeeen/codex-usage-widget</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
-  </PropertyGroup>
-  <PropertyGroup Condition="'$(EnableActivityPreview)' == 'true'">
-    <DefineConstants>$(DefineConstants);ACTIVITY_PREVIEW</DefineConstants>
+    <DefineConstants Condition="'$(EnableActivityPreview)' == 'true'">$(DefineConstants);ACTIVITY_PREVIEW</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <None Include="..\..\LICENSE" Link="LICENSE" CopyToPublishDirectory="PreserveNewest" />
