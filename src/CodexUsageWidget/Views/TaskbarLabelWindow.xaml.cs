@@ -57,6 +57,8 @@ public partial class TaskbarLabelWindow : Window
 
     public bool IsActivityPreviewEnabled => ActivityPreviewMenuItem.IsChecked;
 
+    public void ResetActivityPreview() => ActivityPreviewMenuItem.IsChecked = false;
+
     public void ShowLabel()
     {
         _labelRequested = true;

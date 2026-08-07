@@ -54,8 +54,10 @@ tests/CodexUsageWidget.Tests/ Unit tests for parsing, formatting and persistence
 - Optional token-activity failures degrade only the detailed activity section; core
   rate-limit monitoring remains available.
 - A semaphore prevents concurrent refreshes and a mutex prevents duplicate apps.
-- Activity hook IPC is bounded and local to the current Windows user. Duplicate turn
-  lifecycle events are idempotent and session end removes only that session's turns.
+- Activity hook IPC is bounded and local to the current Windows user. Accepted clients are
+  consumed in order with a per-client read timeout, while separate pipe instances keep parallel
+  Codex sessions connectable. Duplicate turn lifecycle events are idempotent and session end
+  removes only that session's turns.
 - UI hook setup reuses the same compare-before-write configuration plan as the CLI flow.
   Codex remains the owner of hook trust; the widget only reads trust state and opens the
   interactive CLI for the user's explicit `/hooks` approval.

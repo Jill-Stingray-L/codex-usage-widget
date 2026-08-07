@@ -14,12 +14,18 @@ internal static class CodexHookTrustStatusParser
             return CodexHookTrustEvaluation.Unavailable;
         }
 
-        var matchingHooks = entries
+        var matchingEntries = entries
             .EnumerateArray()
+            .Where(entry => ReadHooks(entry).Any(hook => IsExpectedCommand(hook, expectedCommand)))
+            .ToArray();
+        if (matchingEntries.Any(HasConfigurationErrors))
+        {
+            return CodexHookTrustEvaluation.Unavailable;
+        }
+
+        var matchingHooks = matchingEntries
             .SelectMany(ReadHooks)
-            .Where(hook =>
-                ReadString(hook, "command") is { } command &&
-                string.Equals(command, expectedCommand, StringComparison.Ordinal))
+            .Where(hook => IsExpectedCommand(hook, expectedCommand))
             .ToArray();
 
         var requiredHooks = RequiredEvents
@@ -27,6 +33,11 @@ internal static class CodexHookTrustStatusParser
                 string.Equals(ReadString(hook, "eventName"), eventName, StringComparison.Ordinal)))
             .ToArray();
         if (requiredHooks.Any(hook => hook.ValueKind == JsonValueKind.Undefined))
+        {
+            return CodexHookTrustEvaluation.Unavailable;
+        }
+
+        if (requiredHooks.Any(hook => !HasMatchAllMatcher(hook)))
         {
             return CodexHookTrustEvaluation.Unavailable;
         }
@@ -42,6 +53,11 @@ internal static class CodexHookTrustStatusParser
         if (statuses.Any(status => string.Equals(status, "untrusted", StringComparison.Ordinal)))
         {
             return CodexHookTrustEvaluation.ApprovalRequired;
+        }
+
+        if (requiredHooks.Any(hook => !ReadBoolean(hook, "enabled")))
+        {
+            return CodexHookTrustEvaluation.Unavailable;
         }
 
         return statuses.All(status =>
@@ -62,11 +78,36 @@ internal static class CodexHookTrustStatusParser
         return hooks.EnumerateArray().Select(hook => hook.Clone());
     }
 
+    private static bool IsExpectedCommand(JsonElement hook, string expectedCommand) =>
+        ReadString(hook, "command") is { } command &&
+        string.Equals(command, expectedCommand, StringComparison.Ordinal);
+
+    private static bool HasConfigurationErrors(JsonElement entry) =>
+        entry.TryGetProperty("errors", out var errors) &&
+        errors.ValueKind == JsonValueKind.Array &&
+        errors.GetArrayLength() > 0;
+
+    private static bool HasMatchAllMatcher(JsonElement hook)
+    {
+        if (!hook.TryGetProperty("matcher", out var matcher) ||
+            matcher.ValueKind == JsonValueKind.Null)
+        {
+            return true;
+        }
+
+        return matcher.ValueKind == JsonValueKind.String &&
+            matcher.GetString() is "" or "*";
+    }
+
     private static string? ReadString(JsonElement element, string propertyName) =>
         element.TryGetProperty(propertyName, out var value) &&
         value.ValueKind == JsonValueKind.String
             ? value.GetString()
             : null;
+
+    private static bool ReadBoolean(JsonElement element, string propertyName) =>
+        element.TryGetProperty(propertyName, out var value) &&
+        value.ValueKind == JsonValueKind.True;
 }
 
 internal enum CodexHookTrustEvaluation

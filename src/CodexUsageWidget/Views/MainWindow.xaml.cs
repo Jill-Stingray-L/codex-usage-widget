@@ -262,6 +262,9 @@ public partial class MainWindow : Window
 
         if (mode == WidgetDisplayMode.DesktopWidget)
         {
+            _isActivityPreviewEnabled = false;
+            _taskbarLabel.ResetActivityPreview();
+            ApplyActivityIndicatorState();
             _taskbarLabel.HideLabel();
             ShowWidget();
             return;

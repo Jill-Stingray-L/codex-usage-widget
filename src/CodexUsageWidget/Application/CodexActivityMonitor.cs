@@ -3,6 +3,7 @@ namespace CodexUsageWidget.Application;
 public sealed class CodexActivityMonitor : IAsyncDisposable
 {
     private readonly object _stateLock = new();
+    private readonly object _transitionLock = new();
     private readonly ICodexActivitySignalSource _source;
     private readonly HashSet<ActiveTurn> _activeTurns = [];
     private bool _started;
@@ -39,34 +40,37 @@ public sealed class CodexActivityMonitor : IAsyncDisposable
 
     private void SourceOnSignalReceived(CodexActivitySignal signal)
     {
-        bool? changedState = null;
-        lock (_stateLock)
+        lock (_transitionLock)
         {
-            var wasActive = _activeTurns.Count > 0;
-            switch (signal.Kind)
+            bool? changedState = null;
+            lock (_stateLock)
             {
-                case CodexActivitySignalKind.TurnStarted when signal.TurnId is not null:
-                    _activeTurns.Add(new ActiveTurn(signal.SessionId, signal.TurnId));
-                    break;
-                case CodexActivitySignalKind.TurnStopped when signal.TurnId is not null:
-                    _activeTurns.Remove(new ActiveTurn(signal.SessionId, signal.TurnId));
-                    break;
-                case CodexActivitySignalKind.SessionEnded:
-                    _activeTurns.RemoveWhere(turn =>
-                        string.Equals(turn.SessionId, signal.SessionId, StringComparison.Ordinal));
-                    break;
+                var wasActive = _activeTurns.Count > 0;
+                switch (signal.Kind)
+                {
+                    case CodexActivitySignalKind.TurnStarted when signal.TurnId is not null:
+                        _activeTurns.Add(new ActiveTurn(signal.SessionId, signal.TurnId));
+                        break;
+                    case CodexActivitySignalKind.TurnStopped when signal.TurnId is not null:
+                        _activeTurns.Remove(new ActiveTurn(signal.SessionId, signal.TurnId));
+                        break;
+                    case CodexActivitySignalKind.SessionEnded:
+                        _activeTurns.RemoveWhere(turn =>
+                            string.Equals(turn.SessionId, signal.SessionId, StringComparison.Ordinal));
+                        break;
+                }
+
+                var currentActivity = _activeTurns.Count > 0;
+                if (wasActive != currentActivity)
+                {
+                    changedState = currentActivity;
+                }
             }
 
-            var currentActivity = _activeTurns.Count > 0;
-            if (wasActive != currentActivity)
+            if (changedState is { } emittedActivity)
             {
-                changedState = currentActivity;
+                ActivityChanged?.Invoke(emittedActivity);
             }
-        }
-
-        if (changedState is { } emittedActivity)
-        {
-            ActivityChanged?.Invoke(emittedActivity);
         }
     }
 

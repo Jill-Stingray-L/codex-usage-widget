@@ -81,6 +81,52 @@ public sealed class CodexActivityMonitorTests
         Assert.Equal([true, false], changes);
     }
 
+    [Fact]
+    public async Task ActivityNotificationsAreSerializedWithStateTransitions()
+    {
+        await using var source = new FakeSignalSource();
+        await using var monitor = new CodexActivityMonitor(source);
+        var changes = new List<bool>();
+        var startNotificationEntered = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var stopNotificationEntered = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        var releaseStartNotification = new TaskCompletionSource(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        monitor.ActivityChanged += isActive =>
+        {
+            lock (changes)
+            {
+                changes.Add(isActive);
+            }
+
+            if (isActive)
+            {
+                startNotificationEntered.TrySetResult();
+                releaseStartNotification.Task.GetAwaiter().GetResult();
+            }
+            else
+            {
+                stopNotificationEntered.TrySetResult();
+            }
+        };
+        await monitor.StartAsync();
+
+        var startPublish = Task.Run(() =>
+            source.Publish(new(CodexActivitySignalKind.TurnStarted, "session", "turn")));
+        await startNotificationEntered.Task.WaitAsync(TimeSpan.FromSeconds(2));
+        var stopPublish = Task.Run(() =>
+            source.Publish(new(CodexActivitySignalKind.TurnStopped, "session", "turn")));
+
+        await Assert.ThrowsAsync<TimeoutException>(() =>
+            stopNotificationEntered.Task.WaitAsync(TimeSpan.FromMilliseconds(100)));
+        releaseStartNotification.TrySetResult();
+        await Task.WhenAll(startPublish, stopPublish).WaitAsync(TimeSpan.FromSeconds(2));
+
+        Assert.Equal([true, false], changes);
+        Assert.False(monitor.IsActive);
+    }
+
     private sealed class FakeSignalSource : ICodexActivitySignalSource
     {
         public event Action<CodexActivitySignal>? SignalReceived;

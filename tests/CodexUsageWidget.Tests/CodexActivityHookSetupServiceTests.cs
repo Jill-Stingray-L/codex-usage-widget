@@ -2,6 +2,7 @@ using System.Text.Json;
 using CodexUsageWidget.Application;
 using CodexUsageWidget.Infrastructure.Codex;
 using CodexUsageWidget.Infrastructure.Codex.Hooks;
+using CodexUsageWidget.Views.ViewModels;
 
 namespace CodexUsageWidget.Tests;
 
@@ -58,11 +59,89 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task TrustedButDisabledRuntimeHooksAreNotReportedAsActive()
+    {
+        var session = new FakeAppServerSession();
+        var manager = CreateManager();
+        manager.Apply(manager.PlanInstall(WidgetPath));
+        session.Result = CreateHooksListResult(
+            CodexHookConfigurationManager.BuildHookCommand(WidgetPath),
+            "trusted",
+            "trusted",
+            "trusted",
+            enabled: false);
+
+        var status = await CreateService(session).GetStatusAsync();
+
+        Assert.Equal(ActivityHookSetupState.InstalledStatusUnavailable, status.State);
+    }
+
+    [Fact]
+    public async Task RestrictiveMatcherIsNotReportedAsActive()
+    {
+        var session = new FakeAppServerSession();
+        var manager = CreateManager();
+        manager.Apply(manager.PlanInstall(WidgetPath));
+        session.Result = CreateHooksListResult(
+            CodexHookConfigurationManager.BuildHookCommand(WidgetPath),
+            "trusted",
+            "trusted",
+            "trusted",
+            sessionMatcher: "clear");
+
+        var status = await CreateService(session).GetStatusAsync();
+
+        Assert.Equal(ActivityHookSetupState.InstalledStatusUnavailable, status.State);
+    }
+
+    [Fact]
+    public async Task RelevantConfigurationErrorIsNotReportedAsActive()
+    {
+        var session = new FakeAppServerSession();
+        var manager = CreateManager();
+        manager.Apply(manager.PlanInstall(WidgetPath));
+        session.Result = CreateHooksListResult(
+            CodexHookConfigurationManager.BuildHookCommand(WidgetPath),
+            "trusted",
+            "trusted",
+            "trusted",
+            errorsJson: """
+                [{
+                  "path": "C:\\Users\\example\\.codex\\hooks.json",
+                  "message": "failed to load hook configuration"
+                }]
+                """);
+
+        var status = await CreateService(session).GetStatusAsync();
+
+        Assert.Equal(ActivityHookSetupState.InstalledStatusUnavailable, status.State);
+    }
+
+    [Fact]
+    public async Task BenignWarningDoesNotBlockActiveHooks()
+    {
+        var session = new FakeAppServerSession();
+        var manager = CreateManager();
+        manager.Apply(manager.PlanInstall(WidgetPath));
+        session.Result = CreateHooksListResult(
+            CodexHookConfigurationManager.BuildHookCommand(WidgetPath),
+            "trusted",
+            "trusted",
+            "trusted",
+            warningsJson: "[\"unrelated plugin hook could not be loaded\"]");
+
+        var status = await CreateService(session).GetStatusAsync();
+
+        Assert.Equal(ActivityHookSetupState.Active, status.State);
+    }
+
+    [Fact]
     public async Task MissingRuntimeHookIsReportedAsInstalledWithUnknownStatus()
     {
         var session = new FakeAppServerSession
         {
-            Result = ParseElement("""{ "data": [{ "cwd": "C:\\\\work", "hooks": [] }] }""")
+            Result = ParseElement(
+                """{ "data": [{ "cwd": "C:\\\\work", "hooks": [], "errors": [], "warnings": [] }] }""")
         };
         var manager = CreateManager();
         manager.Apply(manager.PlanInstall(WidgetPath));
@@ -73,15 +152,37 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ExplicitlyDisabledHooksHaveDedicatedStatus()
+    public async Task DisabledHooksWithoutInstalledHandlersDoNotOfferUninstall()
     {
         Directory.CreateDirectory(_directory);
         File.WriteAllText(ConfigPath, "[features]\nhooks = false\n");
+        var session = new FakeAppServerSession();
 
-        var status = await CreateService(new FakeAppServerSession()).GetStatusAsync();
+        var status = await CreateService(session).GetStatusAsync();
+        var viewModel = ActivityHookSetupViewModel.FromStatus(status);
 
         Assert.Equal(ActivityHookSetupState.HooksDisabled, status.State);
         Assert.Contains("explicitly disabled", status.Detail, StringComparison.Ordinal);
+        Assert.False(status.HasInstalledHandlers);
+        Assert.False(viewModel.CanUninstall);
+        Assert.Equal(0, session.RequestCount);
+    }
+
+    [Fact]
+    public async Task DisabledHooksWithInstalledHandlersOfferUninstallWithoutStartingAppServer()
+    {
+        var manager = CreateManager();
+        manager.Apply(manager.PlanInstall(WidgetPath));
+        File.WriteAllText(ConfigPath, "[features]\nhooks = false\n");
+        var session = new FakeAppServerSession();
+
+        var status = await CreateService(session).GetStatusAsync();
+        var viewModel = ActivityHookSetupViewModel.FromStatus(status);
+
+        Assert.Equal(ActivityHookSetupState.HooksDisabled, status.State);
+        Assert.True(status.HasInstalledHandlers);
+        Assert.True(viewModel.CanUninstall);
+        Assert.Equal(0, session.RequestCount);
     }
 
     [Fact]
@@ -119,22 +220,54 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
         string command,
         string promptStatus,
         string stopStatus,
-        string sessionStatus)
+        string sessionStatus,
+        bool enabled = true,
+        string? sessionMatcher = null,
+        string warningsJson = "[]",
+        string errorsJson = "[]")
     {
         var serializedCommand = JsonSerializer.Serialize(command);
         return ParseElement($$"""
             {
               "data": [{
                 "cwd": "C:\\work",
+                "errors": {{errorsJson}},
+                "warnings": {{warningsJson}},
                 "hooks": [
-                  { "eventName": "userPromptSubmit", "command": {{serializedCommand}}, "trustStatus": "{{promptStatus}}" },
-                  { "eventName": "stop", "command": {{serializedCommand}}, "trustStatus": "{{stopStatus}}" },
-                  { "eventName": "sessionEnd", "command": {{serializedCommand}}, "trustStatus": "{{sessionStatus}}" }
+                  {{CreateHookJson("userPromptSubmit", serializedCommand, promptStatus, enabled, null)}},
+                  {{CreateHookJson("stop", serializedCommand, stopStatus, enabled, null)}},
+                  {{CreateHookJson("sessionEnd", serializedCommand, sessionStatus, enabled, sessionMatcher)}}
                 ]
               }]
             }
             """);
     }
+
+    private static string CreateHookJson(
+        string eventName,
+        string serializedCommand,
+        string trustStatus,
+        bool enabled,
+        string? matcher) => $$"""
+        {
+          "key": "C:\\Users\\example\\.codex\\hooks.json:{{eventName}}:0:0",
+          "eventName": "{{eventName}}",
+          "handlerType": "command",
+          "matcher": {{JsonSerializer.Serialize(matcher)}},
+          "command": {{serializedCommand}},
+          "timeoutSec": 3,
+          "statusMessage": null,
+          "additionalContextLimit": null,
+          "sourcePath": "C:\\Users\\example\\.codex\\hooks.json",
+          "source": "user",
+          "pluginId": null,
+          "displayOrder": 0,
+          "enabled": {{enabled.ToString().ToLowerInvariant()}},
+          "isManaged": false,
+          "currentHash": "sha256:fixture",
+          "trustStatus": "{{trustStatus}}"
+        }
+        """;
 
     private static JsonElement ParseElement(string json)
     {

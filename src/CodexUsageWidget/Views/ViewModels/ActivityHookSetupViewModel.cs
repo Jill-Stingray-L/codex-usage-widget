@@ -78,6 +78,7 @@ public sealed class ActivityHookSetupViewModel
                 Description = status.Detail ??
                     "Set hooks = true in the [features] section of your Codex config before installing.",
                 StatusBrush = BrushFromHex("#E16D76"),
+                CanUninstall = status.HasInstalledHandlers,
                 CanRefresh = true
             },
             ActivityHookSetupState.InstalledStatusUnavailable => new ActivityHookSetupViewModel

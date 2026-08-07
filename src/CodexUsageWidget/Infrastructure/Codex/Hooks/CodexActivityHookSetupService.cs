@@ -30,11 +30,21 @@ public sealed class CodexActivityHookSetupService : IActivityHookSetupService
         var configurationPlan = _configurationManager.PlanInstall(_processPath);
         if (configurationPlan.Error is not null)
         {
+            var hooksDisabled = configurationPlan.ErrorKind ==
+                CodexHookConfigurationErrorKind.HooksDisabled;
+            var hasInstalledHandlers = false;
+            if (hooksDisabled)
+            {
+                var uninstallPlan = _configurationManager.PlanUninstall(_processPath);
+                hasInstalledHandlers = uninstallPlan.Error is null && uninstallPlan.HasChanges;
+            }
+
             return new ActivityHookSetupStatus(
-                configurationPlan.ErrorKind == CodexHookConfigurationErrorKind.HooksDisabled
+                hooksDisabled
                     ? ActivityHookSetupState.HooksDisabled
                     : ActivityHookSetupState.Error,
-                configurationPlan.Error);
+                configurationPlan.Error,
+                hasInstalledHandlers);
         }
 
         if (configurationPlan.HasChanges)

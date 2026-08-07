@@ -11,6 +11,11 @@ public sealed partial class CodexHookConfigurationManager
 {
     private const int HookTimeoutSeconds = 3;
     private const int LegacyHookTimeoutSeconds = 1;
+    private const string HookArgument = "--codex-activity-hook";
+    private const string WidgetExecutableName = "CodexUsageWidget.exe";
+    private const string NestedPowerShellPrefix =
+        "powershell.exe -NoLogo -NoProfile -NonInteractive " +
+        "-ExecutionPolicy Bypass -Command \"& '";
     private static readonly string[] ActivityEvents = ["UserPromptSubmit", "Stop", "SessionEnd"];
     private static readonly JsonSerializerOptions IndentedJson = new()
     {
@@ -107,17 +112,6 @@ public sealed partial class CodexHookConfigurationManager
         return $"& '{escapedProcessPath}' --codex-activity-hook";
     }
 
-    private static string BuildLegacyHookCommand(string processPath) =>
-        $"\"{processPath}\" --codex-activity-hook";
-
-    private static string BuildNestedPowerShellHookCommand(string processPath)
-    {
-        var escapedProcessPath = processPath.Replace("'", "''", StringComparison.Ordinal);
-        return "powershell.exe -NoLogo -NoProfile -NonInteractive " +
-            "-ExecutionPolicy Bypass -Command " +
-            $"\"& '{escapedProcessPath}' --codex-activity-hook\"";
-    }
-
     private CodexHookConfigurationPlan PlanChange(string processPath, bool install)
     {
         var originalExisted = File.Exists(_hooksPath);
@@ -167,8 +161,6 @@ public sealed partial class CodexHookConfigurationManager
 
         var changed = false;
         var command = BuildHookCommand(processPath);
-        var legacyCommand = BuildLegacyHookCommand(processPath);
-        var nestedPowerShellCommand = BuildNestedPowerShellHookCommand(processPath);
         foreach (var eventName in ActivityEvents)
         {
             if (hooks[eventName] is not null && hooks[eventName] is not JsonArray)
@@ -185,18 +177,11 @@ public sealed partial class CodexHookConfigurationManager
             {
                 groups ??= new JsonArray();
                 hooks[eventName] = groups;
-                changed |= ReplaceHandlers(
-                    groups,
-                    legacyCommand,
-                    LegacyHookTimeoutSeconds,
-                    command);
-                changed |= ReplaceHandlers(
-                    groups,
-                    nestedPowerShellCommand,
-                    HookTimeoutSeconds,
-                    command);
-                if (!ContainsHandler(groups, command))
+                var recognizedCount = CountRecognizedHandlers(groups);
+                var currentCount = CountExactHandlers(groups, command);
+                if (recognizedCount != 1 || currentCount != 1)
                 {
+                    RemoveRecognizedHandlers(groups);
                     groups.Add(new JsonObject
                     {
                         ["hooks"] = new JsonArray(CreateHandler(command))
@@ -206,15 +191,7 @@ public sealed partial class CodexHookConfigurationManager
             }
             else if (groups is not null)
             {
-                changed |= RemoveHandlers(groups, command, HookTimeoutSeconds);
-                changed |= RemoveHandlers(
-                    groups,
-                    legacyCommand,
-                    LegacyHookTimeoutSeconds);
-                changed |= RemoveHandlers(
-                    groups,
-                    nestedPowerShellCommand,
-                    HookTimeoutSeconds);
+                changed |= RemoveRecognizedHandlers(groups);
             }
         }
 
@@ -266,7 +243,7 @@ public sealed partial class CodexHookConfigurationManager
         }
     }
 
-    private static bool ContainsHandler(JsonArray groups, string command)
+    private static int CountExactHandlers(JsonArray groups, string command)
     {
         var expected = CreateHandler(command);
         return groups
@@ -274,57 +251,144 @@ public sealed partial class CodexHookConfigurationManager
             .Select(group => group["hooks"])
             .OfType<JsonArray>()
             .SelectMany(handlers => handlers)
-            .Any(handler => JsonNode.DeepEquals(handler, expected));
+            .Count(handler => JsonNode.DeepEquals(handler, expected));
     }
 
-    private static bool RemoveHandlers(JsonArray groups, string command, int timeoutSeconds)
+    private static int CountRecognizedHandlers(JsonArray groups) =>
+        groups
+            .OfType<JsonObject>()
+            .Select(group => group["hooks"])
+            .OfType<JsonArray>()
+            .SelectMany(handlers => handlers)
+            .Count(IsRecognizedWidgetHandler);
+
+    private static bool RemoveRecognizedHandlers(JsonArray groups)
     {
-        var expected = CreateHandler(command, timeoutSeconds);
         var changed = false;
-        foreach (var handlers in groups
-                     .OfType<JsonObject>()
-                     .Select(group => group["hooks"])
-                     .OfType<JsonArray>())
+        for (var groupIndex = groups.Count - 1; groupIndex >= 0; groupIndex--)
         {
+            if (groups[groupIndex] is not JsonObject group ||
+                group["hooks"] is not JsonArray handlers)
+            {
+                continue;
+            }
+
+            var removedFromGroup = false;
             for (var index = handlers.Count - 1; index >= 0; index--)
             {
-                if (JsonNode.DeepEquals(handlers[index], expected))
+                if (IsRecognizedWidgetHandler(handlers[index]))
                 {
                     handlers.RemoveAt(index);
                     changed = true;
+                    removedFromGroup = true;
                 }
             }
-        }
 
-        return changed;
-    }
-
-    private static bool ReplaceHandlers(
-        JsonArray groups,
-        string oldCommand,
-        int oldTimeoutSeconds,
-        string newCommand)
-    {
-        var expected = CreateHandler(oldCommand, oldTimeoutSeconds);
-        var replacement = CreateHandler(newCommand);
-        var changed = false;
-        foreach (var handlers in groups
-                     .OfType<JsonObject>()
-                     .Select(group => group["hooks"])
-                     .OfType<JsonArray>())
-        {
-            for (var index = 0; index < handlers.Count; index++)
+            if (removedFromGroup && handlers.Count == 0 && group.Count == 1)
             {
-                if (JsonNode.DeepEquals(handlers[index], expected))
-                {
-                    handlers[index] = replacement.DeepClone();
-                    changed = true;
-                }
+                groups.RemoveAt(groupIndex);
             }
         }
 
         return changed;
     }
+
+    private static bool IsRecognizedWidgetHandler(JsonNode? handler)
+    {
+        if (handler is not JsonObject handlerObject ||
+            handlerObject["command"] is not JsonValue commandValue ||
+            !commandValue.TryGetValue<string>(out var command) ||
+            !TryGetGeneratedWidgetCommandTimeout(command, out var timeoutSeconds))
+        {
+            return false;
+        }
+
+        return JsonNode.DeepEquals(handler, CreateHandler(command, timeoutSeconds));
+    }
+
+    private static bool TryGetGeneratedWidgetCommandTimeout(
+        string command,
+        out int timeoutSeconds)
+    {
+        if (TryReadSingleQuotedPath(
+                command,
+                "& '",
+                $"' {HookArgument}",
+                out var processPath) ||
+            TryReadSingleQuotedPath(
+                command,
+                NestedPowerShellPrefix,
+                $"' {HookArgument}\"",
+                out processPath))
+        {
+            timeoutSeconds = HookTimeoutSeconds;
+            return IsWidgetExecutablePath(processPath);
+        }
+
+        const string LegacyPrefix = "\"";
+        var legacySuffix = $"\" {HookArgument}";
+        if (command.StartsWith(LegacyPrefix, StringComparison.Ordinal) &&
+            command.EndsWith(legacySuffix, StringComparison.Ordinal) &&
+            command.Length > LegacyPrefix.Length + legacySuffix.Length)
+        {
+            var pathLength = command.Length - LegacyPrefix.Length - legacySuffix.Length;
+            processPath = command.Substring(LegacyPrefix.Length, pathLength);
+            if (!processPath.Contains('"', StringComparison.Ordinal))
+            {
+                timeoutSeconds = LegacyHookTimeoutSeconds;
+                return IsWidgetExecutablePath(processPath);
+            }
+        }
+
+        timeoutSeconds = 0;
+        return false;
+    }
+
+    private static bool TryReadSingleQuotedPath(
+        string command,
+        string prefix,
+        string suffix,
+        out string processPath)
+    {
+        processPath = string.Empty;
+        if (!command.StartsWith(prefix, StringComparison.Ordinal) ||
+            !command.EndsWith(suffix, StringComparison.Ordinal) ||
+            command.Length <= prefix.Length + suffix.Length)
+        {
+            return false;
+        }
+
+        var escapedPath = command.AsSpan(
+            prefix.Length,
+            command.Length - prefix.Length - suffix.Length);
+        var path = new StringBuilder(escapedPath.Length);
+        for (var index = 0; index < escapedPath.Length; index++)
+        {
+            if (escapedPath[index] != '\'')
+            {
+                path.Append(escapedPath[index]);
+                continue;
+            }
+
+            if (index + 1 >= escapedPath.Length || escapedPath[index + 1] != '\'')
+            {
+                return false;
+            }
+
+            path.Append('\'');
+            index++;
+        }
+
+        processPath = path.ToString();
+        return true;
+    }
+
+    private static bool IsWidgetExecutablePath(string processPath) =>
+        Path.IsPathFullyQualified(processPath) &&
+        string.Equals(
+            Path.GetFileName(processPath),
+            WidgetExecutableName,
+            StringComparison.OrdinalIgnoreCase);
 
     private static JsonObject CreateHandler(
         string command,

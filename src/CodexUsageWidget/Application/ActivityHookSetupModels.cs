@@ -19,7 +19,8 @@ public enum ActivityHookChangeKind
 
 public sealed record ActivityHookSetupStatus(
     ActivityHookSetupState State,
-    string? Detail = null);
+    string? Detail = null,
+    bool HasInstalledHandlers = false);
 
 public sealed record ActivityHookChangePreview(
     ActivityHookChangeKind Kind,

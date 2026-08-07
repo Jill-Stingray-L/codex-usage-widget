@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.IO;
 using System.IO.Pipes;
 using System.Text.Json;
+using System.Threading.Channels;
 using CodexUsageWidget.Application;
 
 namespace CodexUsageWidget.Infrastructure.Codex.Hooks;
@@ -10,16 +11,29 @@ public sealed class CodexActivityPipeSignalSource : ICodexActivitySignalSource
 {
     private const int MaximumPayloadBytes = 4096;
     private const int MaximumIdentifierLength = 256;
+    private const int DefaultReadTimeoutMilliseconds = 1000;
 
     private readonly string _pipeName;
+    private readonly TimeSpan _readTimeout;
     private readonly CancellationTokenSource _lifetime = new();
-    private readonly object _clientTasksLock = new();
-    private readonly HashSet<Task> _clientTasks = [];
+    private readonly Channel<NamedPipeServerStream> _acceptedClients =
+        Channel.CreateUnbounded<NamedPipeServerStream>(new UnboundedChannelOptions
+        {
+            SingleReader = true,
+            SingleWriter = true,
+            AllowSynchronousContinuations = false
+        });
     private Task? _listenTask;
+    private Task? _processTask;
+    private int _disposed;
 
-    public CodexActivityPipeSignalSource(string pipeName = CodexActivityPipeClient.DefaultPipeName)
+    public CodexActivityPipeSignalSource(
+        string pipeName = CodexActivityPipeClient.DefaultPipeName,
+        int readTimeoutMilliseconds = DefaultReadTimeoutMilliseconds)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(readTimeoutMilliseconds);
         _pipeName = pipeName;
+        _readTimeout = TimeSpan.FromMilliseconds(readTimeoutMilliseconds);
     }
 
     public event Action<CodexActivitySignal>? SignalReceived;
@@ -27,6 +41,8 @@ public sealed class CodexActivityPipeSignalSource : ICodexActivitySignalSource
     public Task StartAsync(CancellationToken cancellationToken = default)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        ObjectDisposedException.ThrowIf(_disposed != 0, this);
+        _processTask ??= ProcessClientsAsync(_lifetime.Token);
         _listenTask ??= ListenAsync(_lifetime.Token);
         return Task.CompletedTask;
     }
@@ -48,11 +64,18 @@ public sealed class CodexActivityPipeSignalSource : ICodexActivitySignalSource
                     throw;
                 }
 
-                TrackClientTask(HandleClientAsync(pipe, cancellationToken));
+                if (!_acceptedClients.Writer.TryWrite(pipe))
+                {
+                    pipe.Dispose();
+                }
             }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
+        }
+        finally
+        {
+            _acceptedClients.Writer.TryComplete();
         }
     }
 
@@ -65,44 +88,44 @@ public sealed class CodexActivityPipeSignalSource : ICodexActivitySignalSource
         MaximumPayloadBytes,
         MaximumPayloadBytes);
 
-    private async Task HandleClientAsync(
-        NamedPipeServerStream pipe,
-        CancellationToken cancellationToken)
+    private async Task ProcessClientsAsync(CancellationToken cancellationToken)
     {
-        using (pipe)
+        try
         {
-            try
+            await foreach (var pipe in _acceptedClients.Reader
+                               .ReadAllAsync(cancellationToken)
+                               .ConfigureAwait(false))
             {
-                var signal = await ReadSignalAsync(pipe, cancellationToken).ConfigureAwait(false);
-                if (signal is not null)
+                using (pipe)
                 {
-                    SignalReceived?.Invoke(signal);
+                    using var readTimeout =
+                        CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                    readTimeout.CancelAfter(_readTimeout);
+                    try
+                    {
+                        var signal = await ReadSignalAsync(pipe, readTimeout.Token)
+                            .ConfigureAwait(false);
+                        if (signal is not null)
+                        {
+                            SignalReceived?.Invoke(signal);
+                        }
+                    }
+                    catch (OperationCanceledException) when (readTimeout.IsCancellationRequested)
+                    {
+                    }
                 }
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+        }
+        finally
+        {
+            while (_acceptedClients.Reader.TryRead(out var pipe))
             {
+                pipe.Dispose();
             }
         }
-    }
-
-    private void TrackClientTask(Task task)
-    {
-        lock (_clientTasksLock)
-        {
-            _clientTasks.Add(task);
-        }
-
-        _ = task.ContinueWith(
-            completedTask =>
-            {
-                lock (_clientTasksLock)
-                {
-                    _clientTasks.Remove(completedTask);
-                }
-            },
-            CancellationToken.None,
-            TaskContinuationOptions.ExecuteSynchronously,
-            TaskScheduler.Default);
     }
 
     private static async Task<CodexActivitySignal?> ReadSignalAsync(
@@ -148,19 +171,21 @@ public sealed class CodexActivityPipeSignalSource : ICodexActivitySignalSource
 
     public async ValueTask DisposeAsync()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
         await _lifetime.CancelAsync().ConfigureAwait(false);
         if (_listenTask is not null)
         {
             await _listenTask.ConfigureAwait(false);
         }
 
-        Task[] clientTasks;
-        lock (_clientTasksLock)
+        if (_processTask is not null)
         {
-            clientTasks = [.. _clientTasks];
+            await _processTask.ConfigureAwait(false);
         }
-
-        await Task.WhenAll(clientTasks).ConfigureAwait(false);
 
         _lifetime.Dispose();
     }
