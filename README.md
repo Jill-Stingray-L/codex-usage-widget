@@ -16,6 +16,7 @@ notifications.
 - Credit, spend-control, earned-reset, and model-specific limit details when available
 - Compact, movable, always-on-top desktop widget
 - Native-looking taskbar label beside the Windows notification area
+- Event-driven task activity animation through official local Codex lifecycle hooks
 - Immediate taskbar-label hiding while another app is fullscreen on the same monitor
 - Persistent desktop/taskbar display preference
 - Automatic refresh every two minutes and live server notifications
@@ -71,6 +72,38 @@ consumption because tokens do not map linearly to the remaining subscription per
 
 Use the `−` button to switch to taskbar mode. Right-click the taskbar label or tray
 icon to refresh, change display mode, or exit.
+
+## Codex activity hooks
+
+The taskbar dots can react to real Codex work without polling. Hook installation is
+an explicit, reviewable action and is never performed during normal widget startup.
+From PowerShell in the directory containing the widget executable, run:
+
+```powershell
+.\CodexUsageWidget.exe --install-activity-hooks
+```
+
+The command displays the proposed `~/.codex/hooks.json` content and writes it only
+after interactive confirmation. It preserves existing hooks and unknown fields.
+After installation, start Codex, open `/hooks`, and review and trust the exact new
+`UserPromptSubmit`, `Stop`, and `SessionEnd` definitions. New or changed definitions
+require new trust.
+
+To remove only handlers that exactly match the current widget executable, run:
+
+```powershell
+.\CodexUsageWidget.exe --uninstall-activity-hooks
+```
+
+The hook handler sends only an activity kind, session ID, and turn ID over a local
+current-user named pipe. Prompts, assistant messages, transcript paths, and model
+output are neither forwarded nor logged. If the widget is closed, the handler exits
+successfully after a short bounded connection attempt and Codex continues normally.
+
+Activity state is intentionally in memory only. A task that started before the widget
+or hooks were ready is not reconstructed. If Codex terminates without emitting `Stop`
+or `SessionEnd`, the indicator can remain active until the widget restarts; no arbitrary
+timeout is used because legitimate tasks can run for a long time.
 
 ## Development
 

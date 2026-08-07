@@ -2,6 +2,7 @@ using System.Windows;
 using CodexUsageWidget.Application;
 using CodexUsageWidget.Infrastructure;
 using CodexUsageWidget.Infrastructure.Codex;
+using CodexUsageWidget.Infrastructure.Codex.Hooks;
 using CodexUsageWidget.Infrastructure.Logging;
 using CodexUsageWidget.Infrastructure.Settings;
 using CodexUsageWidget.Infrastructure.Windows;
@@ -31,18 +32,23 @@ public partial class App : System.Windows.Application, IDisposable
         _logger = new FileLogger(AppPaths.LogDirectory);
         _exceptionHandler = new GlobalExceptionHandler(this, _logger);
 
+        CodexActivityMonitor? activityMonitor = null;
         try
         {
             var usageProvider = new CodexUsageProvider(new CodexAppServerSession());
             var usageMonitor = new UsageMonitor(usageProvider);
             usageMonitor.DiagnosticMessage += (_, message) => _logger.Info(message);
 
+            activityMonitor = new CodexActivityMonitor(new CodexActivityPipeSignalSource());
+
             var window = new MainWindow(
                 usageMonitor,
+                activityMonitor,
                 new DisplayModeStore(),
                 new WidgetDensityStore(),
                 new TrayIconService());
             MainWindow = window;
+            activityMonitor.StartAsync().GetAwaiter().GetResult();
             window.Show();
             if (window.StartsInTaskbarIndicatorMode)
             {
@@ -53,6 +59,7 @@ public partial class App : System.Windows.Application, IDisposable
         }
         catch (Exception ex)
         {
+            activityMonitor?.DisposeAsync().AsTask().GetAwaiter().GetResult();
             _logger.LogError("Application startup failed.", ex);
             System.Windows.MessageBox.Show(
                 "Codex Usage Widget could not start. See the log under " + AppPaths.LogDirectory,

@@ -13,6 +13,122 @@
         Focusable="False"
         SnapsToDevicePixels="True"
         UseLayoutRounding="True">
+    <Window.Resources>
+        <SineEase x:Key="ActivityWaveEase"
+                  EasingMode="EaseInOut" />
+
+        <Storyboard x:Key="ActivityExpandStoryboard"
+                    FillBehavior="HoldEnd"
+                    Timeline.DesiredFrameRate="60">
+            <DoubleAnimation Storyboard.TargetName="LeftActivityDot"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0"
+                             To="1"
+                             Duration="0:0:0.22">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="LeftActivityDotTransform"
+                             Storyboard.TargetProperty="X"
+                             From="0"
+                             To="-12"
+                             Duration="0:0:0.22">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="CenterActivityDot"
+                             Storyboard.TargetProperty="Opacity"
+                             From="0"
+                             To="1"
+                             Duration="0:0:0.22">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="CenterActivityDotTransform"
+                             Storyboard.TargetProperty="X"
+                             From="0"
+                             To="-6"
+                             Duration="0:0:0.22">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+
+        <Storyboard x:Key="ActivityWaveStoryboard"
+                    Timeline.DesiredFrameRate="60">
+            <DoubleAnimation Storyboard.TargetName="LeftActivityDot"
+                             Storyboard.TargetProperty="Opacity"
+                             From="1"
+                             To="0.35"
+                             BeginTime="0:0:0.32"
+                             Duration="0:0:0.36"
+                             AutoReverse="True"
+                             RepeatBehavior="Forever"
+                             EasingFunction="{StaticResource ActivityWaveEase}" />
+            <DoubleAnimation Storyboard.TargetName="CenterActivityDot"
+                             Storyboard.TargetProperty="Opacity"
+                             From="1"
+                             To="0.35"
+                             BeginTime="0:0:0.16"
+                             Duration="0:0:0.36"
+                             AutoReverse="True"
+                             RepeatBehavior="Forever"
+                             EasingFunction="{StaticResource ActivityWaveEase}" />
+            <DoubleAnimation Storyboard.TargetName="RightActivityDot"
+                             Storyboard.TargetProperty="Opacity"
+                             From="1"
+                             To="0.35"
+                             Duration="0:0:0.36"
+                             AutoReverse="True"
+                             RepeatBehavior="Forever"
+                             EasingFunction="{StaticResource ActivityWaveEase}" />
+        </Storyboard>
+
+        <Storyboard x:Key="ActivityCollapseStoryboard"
+                    Timeline.DesiredFrameRate="60">
+            <DoubleAnimation Storyboard.TargetName="LeftActivityDot"
+                             Storyboard.TargetProperty="Opacity"
+                             From="1"
+                             To="0"
+                             Duration="0:0:0.2">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="LeftActivityDotTransform"
+                             Storyboard.TargetProperty="X"
+                             From="-12"
+                             To="0"
+                             Duration="0:0:0.2">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="CenterActivityDot"
+                             Storyboard.TargetProperty="Opacity"
+                             From="1"
+                             To="0"
+                             Duration="0:0:0.2">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="CenterActivityDotTransform"
+                             Storyboard.TargetProperty="X"
+                             From="-6"
+                             To="0"
+                             Duration="0:0:0.2">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseIn" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+    </Window.Resources>
+
     <Border x:Name="LabelSurface"
             CornerRadius="6"
             Cursor="Hand"
@@ -33,6 +149,10 @@
             <ContextMenu>
                 <MenuItem Header="Open widget" Click="OpenMenuItem_OnClick" />
                 <MenuItem Header="Refresh" Click="RefreshMenuItem_OnClick" />
+                <MenuItem x:Name="ActivityPreviewMenuItem"
+                          Header="Preview activity animation"
+                          IsCheckable="True"
+                          Click="ActivityPreviewMenuItem_OnClick" />
                 <Separator />
                 <MenuItem Header="Use desktop widget" Click="DesktopModeMenuItem_OnClick" />
                 <Separator />
@@ -45,14 +165,47 @@
                    FontSize="12"
                    TextOptions.TextFormattingMode="Ideal">
             <InlineUIContainer BaselineAlignment="Center">
-                <Ellipse Width="3"
-                         Height="3"
-                         Margin="0,0,6,0"
-                         Fill="#D8D8D8">
-                    <Ellipse.RenderTransform>
-                        <TranslateTransform Y="1" />
-                    </Ellipse.RenderTransform>
-                </Ellipse>
+                <Canvas Width="3"
+                        Height="3"
+                        Margin="0,0,6,0"
+                        SnapsToDevicePixels="False"
+                        UseLayoutRounding="False">
+                    <Ellipse x:Name="LeftActivityDot"
+                             Canvas.Left="0"
+                             Canvas.Top="0"
+                             Width="3"
+                             Height="3"
+                             Opacity="0"
+                             Fill="#D8D8D8">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="LeftActivityDotTransform"
+                                                Y="2" />
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Ellipse x:Name="CenterActivityDot"
+                             Canvas.Left="0"
+                             Canvas.Top="0"
+                             Width="3"
+                             Height="3"
+                             Opacity="0"
+                             Fill="#D8D8D8">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="CenterActivityDotTransform"
+                                                Y="2" />
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                    <Ellipse x:Name="RightActivityDot"
+                             Canvas.Left="0"
+                             Canvas.Top="0"
+                             Width="3"
+                             Height="3"
+                             Fill="#D8D8D8">
+                        <Ellipse.RenderTransform>
+                            <TranslateTransform x:Name="RightActivityDotTransform"
+                                                Y="2" />
+                        </Ellipse.RenderTransform>
+                    </Ellipse>
+                </Canvas>
             </InlineUIContainer><Run
                 Text="Codex"
                 FontWeight="Medium"

@@ -19,6 +19,7 @@ public partial class MainWindow : Window
     private const double DetailedHeight = 620d;
 
     private readonly UsageMonitor _usageMonitor;
+    private readonly CodexActivityMonitor _activityMonitor;
     private readonly DisplayModeStore _displayModeStore;
     private readonly WidgetDensityStore _densityStore;
     private readonly TrayIconService _trayIcon;
@@ -31,11 +32,13 @@ public partial class MainWindow : Window
 
     public MainWindow(
         UsageMonitor usageMonitor,
+        CodexActivityMonitor activityMonitor,
         DisplayModeStore displayModeStore,
         WidgetDensityStore densityStore,
         TrayIconService trayIcon)
     {
         _usageMonitor = usageMonitor;
+        _activityMonitor = activityMonitor;
         _displayModeStore = displayModeStore;
         _densityStore = densityStore;
         _trayIcon = trayIcon;
@@ -60,6 +63,7 @@ public partial class MainWindow : Window
         _usageMonitor.RefreshStarted += UsageMonitorOnRefreshStarted;
         _usageMonitor.SnapshotUpdated += UsageMonitorOnSnapshotUpdated;
         _usageMonitor.RefreshFailed += UsageMonitorOnRefreshFailed;
+        _activityMonitor.ActivityChanged += ActivityMonitorOnActivityChanged;
 
         _taskbarLabel.OpenRequested += (_, _) =>
             Dispatcher.BeginInvoke(_widgetVisibility.Show, DispatcherPriority.ApplicationIdle);
@@ -100,6 +104,9 @@ public partial class MainWindow : Window
 
     private void UsageMonitorOnRefreshFailed(string message) =>
         Dispatcher.BeginInvoke(() => RenderError(message));
+
+    private void ActivityMonitorOnActivityChanged(bool isActive) =>
+        Dispatcher.BeginInvoke(() => _taskbarLabel.SetActivityState(isActive));
 
     private void RenderSnapshot(UsageSnapshot snapshot)
     {
@@ -278,6 +285,7 @@ public partial class MainWindow : Window
         _taskbarLabel.HideLabel();
         _taskbarLabel.Close();
         _trayIcon.Dispose();
+        _activityMonitor.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _usageMonitor.DisposeAsync().AsTask().GetAwaiter().GetResult();
         System.Windows.Application.Current.Shutdown();
     }
