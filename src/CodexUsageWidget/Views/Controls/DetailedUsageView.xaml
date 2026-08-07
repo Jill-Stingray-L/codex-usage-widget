@@ -104,7 +104,7 @@
                                 <Grid Margin="1,0" ToolTip="{Binding ToolTip}">
                                     <Border Height="{Binding Height}"
                                             VerticalAlignment="Bottom"
-                                            Background="#8FC9B0"
+                                            Background="{StaticResource AccentDataBrush}"
                                             CornerRadius="2,2,0,0" />
                                 </Grid>
                             </DataTemplate>

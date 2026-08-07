@@ -15,6 +15,7 @@ public partial class TaskbarLabelWindow : Window
     private readonly WindowChangeWatcher _windowChangeWatcher;
     private IntPtr _windowHandle;
     private bool _labelRequested;
+    private bool _isTaskActive;
     private int _visibilityUpdateQueued;
 
     public TaskbarLabelWindow()
@@ -44,11 +45,19 @@ public partial class TaskbarLabelWindow : Window
 
     public event EventHandler? RefreshRequested;
 
+    public event EventHandler? ActivityDotsSetupRequested;
+
+    public event EventHandler? ActivityPreviewChanged;
+
     public event EventHandler? DesktopModeRequested;
 
     public event EventHandler? ExitRequested;
 
     public bool IsPointerOver => IsMouseOver;
+
+    public bool IsActivityPreviewEnabled => ActivityPreviewMenuItem.IsChecked;
+
+    public void ResetActivityPreview() => ActivityPreviewMenuItem.IsChecked = false;
 
     public void ShowLabel()
     {
@@ -63,6 +72,17 @@ public partial class TaskbarLabelWindow : Window
         _labelRequested = false;
         _positionTimer.Stop();
         Hide();
+    }
+
+    public void SetActivityState(bool isActive)
+    {
+        if (_isTaskActive == isActive)
+        {
+            return;
+        }
+
+        _isTaskActive = isActive;
+        ActivityDots.IsActive = isActive;
     }
 
     public void UpdateUsage(double? remainingPercent, DateTimeOffset? resetsAt)
@@ -140,6 +160,12 @@ public partial class TaskbarLabelWindow : Window
 
     private void RefreshMenuItem_OnClick(object sender, RoutedEventArgs e) =>
         RefreshRequested?.Invoke(this, EventArgs.Empty);
+
+    private void ActivityDotsMenuItem_OnClick(object sender, RoutedEventArgs e) =>
+        ActivityDotsSetupRequested?.Invoke(this, EventArgs.Empty);
+
+    private void ActivityPreviewMenuItem_OnClick(object sender, RoutedEventArgs e)
+        => ActivityPreviewChanged?.Invoke(this, EventArgs.Empty);
 
     private void DesktopModeMenuItem_OnClick(object sender, RoutedEventArgs e) =>
         DesktopModeRequested?.Invoke(this, EventArgs.Empty);

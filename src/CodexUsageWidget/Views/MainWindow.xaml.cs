@@ -19,6 +19,8 @@ public partial class MainWindow : Window
     private const double DetailedHeight = 620d;
 
     private readonly UsageMonitor _usageMonitor;
+    private readonly CodexActivityMonitor _activityMonitor;
+    private readonly ActivityHookSetupWindowController _activityHookSetupWindows;
     private readonly DisplayModeStore _displayModeStore;
     private readonly WidgetDensityStore _densityStore;
     private readonly TrayIconService _trayIcon;
@@ -27,15 +29,25 @@ public partial class MainWindow : Window
     private WidgetDisplayMode _displayMode;
     private WidgetDensity _density;
     private UsageWidgetViewModel _viewModel = UsageWidgetViewModel.Loading();
+    private bool _isRealActivityActive;
+    private bool _isActivityPreviewEnabled;
     private bool _allowClose;
 
     public MainWindow(
         UsageMonitor usageMonitor,
+        CodexActivityMonitor activityMonitor,
+        IActivityHookSetupService activityHookSetupService,
+        ICodexLauncher codexLauncher,
         DisplayModeStore displayModeStore,
         WidgetDensityStore densityStore,
         TrayIconService trayIcon)
     {
         _usageMonitor = usageMonitor;
+        _activityMonitor = activityMonitor;
+        _activityHookSetupWindows = new ActivityHookSetupWindowController(
+            this,
+            activityHookSetupService,
+            codexLauncher);
         _displayModeStore = displayModeStore;
         _densityStore = densityStore;
         _trayIcon = trayIcon;
@@ -60,12 +72,28 @@ public partial class MainWindow : Window
         _usageMonitor.RefreshStarted += UsageMonitorOnRefreshStarted;
         _usageMonitor.SnapshotUpdated += UsageMonitorOnSnapshotUpdated;
         _usageMonitor.RefreshFailed += UsageMonitorOnRefreshFailed;
+        _activityMonitor.ActivityChanged += ActivityMonitorOnActivityChanged;
+        _activityHookSetupWindows.Closed += (_, _) =>
+        {
+            if (_displayMode == WidgetDisplayMode.TaskbarIndicator)
+            {
+                Hide();
+            }
+        };
 
         _taskbarLabel.OpenRequested += (_, _) =>
             Dispatcher.BeginInvoke(_widgetVisibility.Show, DispatcherPriority.ApplicationIdle);
         _taskbarLabel.ToggleRequested += (_, _) => _widgetVisibility.Toggle();
         _taskbarLabel.RefreshRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => _ = _usageMonitor.RefreshAsync());
+        _taskbarLabel.ActivityDotsSetupRequested += (_, _) =>
+            Dispatcher.BeginInvoke(ShowActivityHookSetup);
+        _taskbarLabel.ActivityPreviewChanged += (_, _) =>
+            Dispatcher.BeginInvoke(() =>
+            {
+                _isActivityPreviewEnabled = _taskbarLabel.IsActivityPreviewEnabled;
+                ApplyActivityIndicatorState();
+            });
         _taskbarLabel.DesktopModeRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget));
         _taskbarLabel.ExitRequested += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
@@ -73,6 +101,8 @@ public partial class MainWindow : Window
         _trayIcon.OpenRequested += (_, _) => Dispatcher.BeginInvoke(_widgetVisibility.Show);
         _trayIcon.RefreshRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => _ = _usageMonitor.RefreshAsync());
+        _trayIcon.ActivityDotsSetupRequested += (_, _) =>
+            Dispatcher.BeginInvoke(ShowActivityHookSetup);
         _trayIcon.DesktopModeRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget));
         _trayIcon.TaskbarModeRequested += (_, _) =>
@@ -100,6 +130,20 @@ public partial class MainWindow : Window
 
     private void UsageMonitorOnRefreshFailed(string message) =>
         Dispatcher.BeginInvoke(() => RenderError(message));
+
+    private void ActivityMonitorOnActivityChanged(bool isActive) =>
+        Dispatcher.BeginInvoke(() =>
+        {
+            _isRealActivityActive = isActive;
+            ApplyActivityIndicatorState();
+        });
+
+    private void ApplyActivityIndicatorState()
+    {
+        var isActive = _isRealActivityActive || _isActivityPreviewEnabled;
+        WidgetActivityDots.IsActive = isActive;
+        _taskbarLabel.SetActivityState(isActive);
+    }
 
     private void RenderSnapshot(UsageSnapshot snapshot)
     {
@@ -200,6 +244,16 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ShowActivityHookSetup()
+    {
+        if (!IsVisible)
+        {
+            ShowWidget();
+        }
+
+        _activityHookSetupWindows.Show();
+    }
+
     private void SetDisplayMode(WidgetDisplayMode mode)
     {
         _displayMode = mode;
@@ -208,6 +262,9 @@ public partial class MainWindow : Window
 
         if (mode == WidgetDisplayMode.DesktopWidget)
         {
+            _isActivityPreviewEnabled = false;
+            _taskbarLabel.ResetActivityPreview();
+            ApplyActivityIndicatorState();
             _taskbarLabel.HideLabel();
             ShowWidget();
             return;
@@ -247,6 +304,9 @@ public partial class MainWindow : Window
 
     private void DensityButton_OnClick(object sender, RoutedEventArgs e) => ToggleDensity();
 
+    private void ActivityDotsButton_OnClick(object sender, RoutedEventArgs e) =>
+        ShowActivityHookSetup();
+
     private void HideButton_OnClick(object sender, RoutedEventArgs e) =>
         SetDisplayMode(WidgetDisplayMode.TaskbarIndicator);
 
@@ -254,7 +314,8 @@ public partial class MainWindow : Window
 
     private void MainWindowOnDeactivated(object? sender, EventArgs e)
     {
-        if (_displayMode == WidgetDisplayMode.TaskbarIndicator)
+        if (_displayMode == WidgetDisplayMode.TaskbarIndicator &&
+            !_activityHookSetupWindows.IsOpen)
         {
             _widgetVisibility.HideOnDeactivated(_taskbarLabel.IsPointerOver);
         }
@@ -278,6 +339,7 @@ public partial class MainWindow : Window
         _taskbarLabel.HideLabel();
         _taskbarLabel.Close();
         _trayIcon.Dispose();
+        _activityMonitor.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _usageMonitor.DisposeAsync().AsTask().GetAwaiter().GetResult();
         System.Windows.Application.Current.Shutdown();
     }
