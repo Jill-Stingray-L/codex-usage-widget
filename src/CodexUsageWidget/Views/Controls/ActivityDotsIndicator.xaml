@@ -16,7 +16,6 @@
                     Timeline.DesiredFrameRate="60">
             <DoubleAnimation Storyboard.TargetName="LeftActivityDot"
                              Storyboard.TargetProperty="Opacity"
-                             From="0"
                              To="1"
                              Duration="0:0:0.22">
                 <DoubleAnimation.EasingFunction>
@@ -25,7 +24,6 @@
             </DoubleAnimation>
             <DoubleAnimation Storyboard.TargetName="LeftActivityDotTransform"
                              Storyboard.TargetProperty="X"
-                             From="0"
                              To="-12"
                              Duration="0:0:0.22">
                 <DoubleAnimation.EasingFunction>
@@ -34,7 +32,6 @@
             </DoubleAnimation>
             <DoubleAnimation Storyboard.TargetName="CenterActivityDot"
                              Storyboard.TargetProperty="Opacity"
-                             From="0"
                              To="1"
                              Duration="0:0:0.22">
                 <DoubleAnimation.EasingFunction>
@@ -43,13 +40,24 @@
             </DoubleAnimation>
             <DoubleAnimation Storyboard.TargetName="CenterActivityDotTransform"
                              Storyboard.TargetProperty="X"
-                             From="0"
                              To="-6"
                              Duration="0:0:0.22">
                 <DoubleAnimation.EasingFunction>
                     <CubicEase EasingMode="EaseOut" />
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="RightActivityDot"
+                             Storyboard.TargetProperty="Opacity"
+                             To="1"
+                             Duration="0:0:0.22" />
+            <DoubleAnimation Storyboard.TargetName="RightActivityDotScale"
+                             Storyboard.TargetProperty="ScaleX"
+                             To="1"
+                             Duration="0:0:0.22" />
+            <DoubleAnimation Storyboard.TargetName="RightActivityDotScale"
+                             Storyboard.TargetProperty="ScaleY"
+                             To="1"
+                             Duration="0:0:0.22" />
         </Storyboard>
 
         <Storyboard x:Key="ActivityWaveStoryboard"
@@ -82,42 +90,88 @@
                              EasingFunction="{StaticResource ActivityWaveEase}" />
         </Storyboard>
 
-        <Storyboard x:Key="ActivityCollapseStoryboard"
+        <Storyboard x:Key="ActivitySettleStoryboard"
+                    FillBehavior="HoldEnd"
                     Timeline.DesiredFrameRate="60">
             <DoubleAnimation Storyboard.TargetName="LeftActivityDot"
                              Storyboard.TargetProperty="Opacity"
-                             From="1"
+                             To="1"
+                             Duration="0:0:0.1">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="CenterActivityDot"
+                             Storyboard.TargetProperty="Opacity"
+                             To="1"
+                             Duration="0:0:0.1">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="RightActivityDot"
+                             Storyboard.TargetProperty="Opacity"
+                             To="1"
+                             Duration="0:0:0.1">
+                <DoubleAnimation.EasingFunction>
+                    <CubicEase EasingMode="EaseOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+        </Storyboard>
+
+        <Storyboard x:Key="ActivityCollapseStoryboard"
+                    FillBehavior="HoldEnd"
+                    Timeline.DesiredFrameRate="60">
+            <DoubleAnimation Storyboard.TargetName="LeftActivityDot"
+                             Storyboard.TargetProperty="Opacity"
                              To="0"
-                             Duration="0:0:0.2">
+                             Duration="0:0:0.22">
                 <DoubleAnimation.EasingFunction>
                     <CubicEase EasingMode="EaseIn" />
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
             <DoubleAnimation Storyboard.TargetName="LeftActivityDotTransform"
                              Storyboard.TargetProperty="X"
-                             From="-12"
                              To="0"
-                             Duration="0:0:0.2">
+                             Duration="0:0:0.22">
                 <DoubleAnimation.EasingFunction>
                     <CubicEase EasingMode="EaseIn" />
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
             <DoubleAnimation Storyboard.TargetName="CenterActivityDot"
                              Storyboard.TargetProperty="Opacity"
-                             From="1"
                              To="0"
-                             Duration="0:0:0.2">
+                             Duration="0:0:0.22">
                 <DoubleAnimation.EasingFunction>
                     <CubicEase EasingMode="EaseIn" />
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
             <DoubleAnimation Storyboard.TargetName="CenterActivityDotTransform"
                              Storyboard.TargetProperty="X"
-                             From="-6"
                              To="0"
-                             Duration="0:0:0.2">
+                             Duration="0:0:0.22">
                 <DoubleAnimation.EasingFunction>
                     <CubicEase EasingMode="EaseIn" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="RightActivityDotScale"
+                             Storyboard.TargetProperty="ScaleX"
+                             To="1.2"
+                             BeginTime="0:0:0.12"
+                             Duration="0:0:0.09"
+                             AutoReverse="True">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut" />
+                </DoubleAnimation.EasingFunction>
+            </DoubleAnimation>
+            <DoubleAnimation Storyboard.TargetName="RightActivityDotScale"
+                             Storyboard.TargetProperty="ScaleY"
+                             To="1.2"
+                             BeginTime="0:0:0.12"
+                             Duration="0:0:0.09"
+                             AutoReverse="True">
+                <DoubleAnimation.EasingFunction>
+                    <SineEase EasingMode="EaseInOut" />
                 </DoubleAnimation.EasingFunction>
             </DoubleAnimation>
         </Storyboard>
@@ -155,9 +209,13 @@
                  Canvas.Top="0"
                  Width="3.75"
                  Height="3.75"
+                 RenderTransformOrigin="0.5,0.5"
                  Fill="{Binding DotBrush, ElementName=Root}">
             <Ellipse.RenderTransform>
-                <TranslateTransform Y="{Binding DotVerticalOffset, ElementName=Root}" />
+                <TransformGroup>
+                    <ScaleTransform x:Name="RightActivityDotScale" />
+                    <TranslateTransform Y="{Binding DotVerticalOffset, ElementName=Root}" />
+                </TransformGroup>
             </Ellipse.RenderTransform>
         </Ellipse>
     </Canvas>

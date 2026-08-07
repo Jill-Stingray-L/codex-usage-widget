@@ -6,6 +6,9 @@ namespace CodexUsageWidget.Views.Controls;
 public partial class ActivityDotsIndicator : System.Windows.Controls.UserControl
 {
     private static readonly System.Windows.Media.Brush DefaultDotBrush = CreateDefaultDotBrush();
+    private static readonly TimeSpan MinimumVisibleDuration = TimeSpan.FromMilliseconds(700d);
+    // Matches the 100 ms settle plus 300 ms collapse sequence in XAML.
+    private static readonly TimeSpan CompletionSequenceDuration = TimeSpan.FromMilliseconds(400d);
 
     public static readonly DependencyProperty IsActiveProperty = DependencyProperty.Register(
         nameof(IsActive),
@@ -33,9 +36,12 @@ public partial class ActivityDotsIndicator : System.Windows.Controls.UserControl
 
     private readonly Storyboard _expandStoryboard;
     private readonly Storyboard _waveStoryboard;
+    private readonly Storyboard _settleStoryboard;
     private readonly Storyboard _collapseStoryboard;
+    private readonly System.Windows.Threading.DispatcherTimer _completionDelayTimer;
     private bool _isReady;
-    private bool _isExpanded;
+    private ActivityVisualState _visualState;
+    private long _activationStartedTimestamp;
 
     public ActivityDotsIndicator()
     {
@@ -43,17 +49,20 @@ public partial class ActivityDotsIndicator : System.Windows.Controls.UserControl
 
         _expandStoryboard = FindStoryboard("ActivityExpandStoryboard");
         _waveStoryboard = FindStoryboard("ActivityWaveStoryboard");
+        _settleStoryboard = FindStoryboard("ActivitySettleStoryboard");
         _collapseStoryboard = FindStoryboard("ActivityCollapseStoryboard");
         _expandStoryboard.Completed += ExpandStoryboardOnCompleted;
+        _settleStoryboard.Completed += SettleStoryboardOnCompleted;
         _collapseStoryboard.Completed += CollapseStoryboardOnCompleted;
+
+        _completionDelayTimer = new System.Windows.Threading.DispatcherTimer();
+        _completionDelayTimer.Tick += CompletionDelayTimerOnTick;
 
         Loaded += ActivityDotsIndicatorOnLoaded;
         Unloaded += ActivityDotsIndicatorOnUnloaded;
         IsVisibleChanged += ActivityDotsIndicatorOnIsVisibleChanged;
         ResetToIdleState();
     }
-
-    public event EventHandler? CollapseCompleted;
 
     public bool IsActive
     {
@@ -101,7 +110,7 @@ public partial class ActivityDotsIndicator : System.Windows.Controls.UserControl
         DependencyPropertyChangedEventArgs e)
     {
         var indicator = (ActivityDotsIndicator)dependencyObject;
-        if (!indicator.IsActive)
+        if (indicator._visualState == ActivityVisualState.Idle)
         {
             indicator.Visibility = indicator.ShowIdleDot
                 ? Visibility.Visible
@@ -112,20 +121,17 @@ public partial class ActivityDotsIndicator : System.Windows.Controls.UserControl
     private void ActivityDotsIndicatorOnLoaded(object sender, RoutedEventArgs e)
     {
         _isReady = true;
+        ResetToIdleState();
         if (IsActive)
         {
-            ApplyVisualState();
-        }
-        else
-        {
-            ResetToIdleState();
+            BeginOrResumeActivity();
         }
     }
 
     private void ActivityDotsIndicatorOnUnloaded(object sender, RoutedEventArgs e)
     {
         _isReady = false;
-        StopAllStoryboards();
+        ResetToIdleState();
     }
 
     private void ActivityDotsIndicatorOnIsVisibleChanged(
@@ -146,43 +152,118 @@ public partial class ActivityDotsIndicator : System.Windows.Controls.UserControl
     {
         if (IsActive)
         {
-            Visibility = Visibility.Visible;
-            _collapseStoryboard.Remove(this);
-            _waveStoryboard.Remove(this);
-            _expandStoryboard.Begin(this, HandoffBehavior.SnapshotAndReplace, isControllable: true);
+            BeginOrResumeActivity();
             return;
         }
 
-        StopWave();
-        _expandStoryboard.Remove(this);
-        _collapseStoryboard.Begin(this, HandoffBehavior.SnapshotAndReplace, isControllable: true);
+        ScheduleCompletion();
+    }
+
+    private void BeginOrResumeActivity()
+    {
+        CancelCompletionDelay();
+        Visibility = Visibility.Visible;
+
+        if (_visualState is ActivityVisualState.Expanding or ActivityVisualState.Active)
+        {
+            StartWaveIfReady();
+            return;
+        }
+
+        CaptureCurrentVisualStateAndStopAnimations();
+        _activationStartedTimestamp = System.Diagnostics.Stopwatch.GetTimestamp();
+        _visualState = ActivityVisualState.Expanding;
+        _expandStoryboard.Begin(this, HandoffBehavior.SnapshotAndReplace, isControllable: true);
+    }
+
+    private void ScheduleCompletion()
+    {
+        if (_visualState is ActivityVisualState.Idle or
+            ActivityVisualState.Settling or
+            ActivityVisualState.Collapsing)
+        {
+            return;
+        }
+
+        var elapsed = System.Diagnostics.Stopwatch.GetElapsedTime(_activationStartedTimestamp);
+        var delay = MinimumVisibleDuration - CompletionSequenceDuration - elapsed;
+        if (delay <= TimeSpan.Zero)
+        {
+            BeginSettle();
+            return;
+        }
+
+        _completionDelayTimer.Stop();
+        _completionDelayTimer.Interval = delay;
+        _completionDelayTimer.Start();
+    }
+
+    private void CompletionDelayTimerOnTick(object? sender, EventArgs e)
+    {
+        CancelCompletionDelay();
+        if (!IsActive)
+        {
+            BeginSettle();
+        }
+    }
+
+    private void BeginSettle()
+    {
+        if (_visualState is ActivityVisualState.Idle or
+            ActivityVisualState.Settling or
+            ActivityVisualState.Collapsing)
+        {
+            return;
+        }
+
+        CancelCompletionDelay();
+        CaptureCurrentVisualStateAndStopAnimations();
+        _visualState = ActivityVisualState.Settling;
+        _settleStoryboard.Begin(this, HandoffBehavior.SnapshotAndReplace, isControllable: true);
     }
 
     private void ExpandStoryboardOnCompleted(object? sender, EventArgs e)
     {
-        if (!IsActive)
+        if (_visualState != ActivityVisualState.Expanding)
         {
             return;
         }
 
-        _isExpanded = true;
+        _visualState = ActivityVisualState.Active;
         StartWaveIfReady();
+    }
+
+    private void SettleStoryboardOnCompleted(object? sender, EventArgs e)
+    {
+        if (_visualState != ActivityVisualState.Settling)
+        {
+            return;
+        }
+
+        CaptureCurrentVisualStateAndStopAnimations();
+        _visualState = ActivityVisualState.Collapsing;
+        _collapseStoryboard.Begin(this, HandoffBehavior.SnapshotAndReplace, isControllable: true);
     }
 
     private void CollapseStoryboardOnCompleted(object? sender, EventArgs e)
     {
-        if (IsActive)
+        if (_visualState != ActivityVisualState.Collapsing)
         {
             return;
         }
 
+        if (IsActive)
+        {
+            BeginOrResumeActivity();
+            return;
+        }
+
         ResetToIdleState();
-        CollapseCompleted?.Invoke(this, EventArgs.Empty);
     }
 
     private void StartWaveIfReady()
     {
-        if (_isReady && _isExpanded && IsActive && IsVisible)
+        if (_isReady && _visualState == ActivityVisualState.Active && IsVisible)
         {
             _waveStoryboard.Begin(this, HandoffBehavior.SnapshotAndReplace, isControllable: true);
         }
@@ -194,18 +275,45 @@ public partial class ActivityDotsIndicator : System.Windows.Controls.UserControl
     {
         _expandStoryboard.Remove(this);
         _waveStoryboard.Remove(this);
+        _settleStoryboard.Remove(this);
         _collapseStoryboard.Remove(this);
+    }
+
+    private void CancelCompletionDelay() => _completionDelayTimer.Stop();
+
+    private void CaptureCurrentVisualStateAndStopAnimations()
+    {
+        var leftOpacity = LeftActivityDot.Opacity;
+        var leftOffset = LeftActivityDotTransform.X;
+        var centerOpacity = CenterActivityDot.Opacity;
+        var centerOffset = CenterActivityDotTransform.X;
+        var rightOpacity = RightActivityDot.Opacity;
+        var rightScaleX = RightActivityDotScale.ScaleX;
+        var rightScaleY = RightActivityDotScale.ScaleY;
+
+        StopAllStoryboards();
+
+        LeftActivityDot.Opacity = leftOpacity;
+        LeftActivityDotTransform.X = leftOffset;
+        CenterActivityDot.Opacity = centerOpacity;
+        CenterActivityDotTransform.X = centerOffset;
+        RightActivityDot.Opacity = rightOpacity;
+        RightActivityDotScale.ScaleX = rightScaleX;
+        RightActivityDotScale.ScaleY = rightScaleY;
     }
 
     private void ResetToIdleState()
     {
+        CancelCompletionDelay();
         StopAllStoryboards();
-        _isExpanded = false;
+        _visualState = ActivityVisualState.Idle;
         LeftActivityDot.Opacity = 0d;
         LeftActivityDotTransform.X = 0d;
         CenterActivityDot.Opacity = 0d;
         CenterActivityDotTransform.X = 0d;
         RightActivityDot.Opacity = 1d;
+        RightActivityDotScale.ScaleX = 1d;
+        RightActivityDotScale.ScaleY = 1d;
         Visibility = ShowIdleDot ? Visibility.Visible : Visibility.Collapsed;
     }
 
@@ -218,5 +326,14 @@ public partial class ActivityDotsIndicator : System.Windows.Controls.UserControl
             System.Windows.Media.Color.FromRgb(216, 216, 216));
         brush.Freeze();
         return brush;
+    }
+
+    private enum ActivityVisualState
+    {
+        Idle,
+        Expanding,
+        Active,
+        Settling,
+        Collapsing
     }
 }

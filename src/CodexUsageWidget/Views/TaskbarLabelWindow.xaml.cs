@@ -21,7 +21,6 @@ public partial class TaskbarLabelWindow : Window
     public TaskbarLabelWindow()
     {
         InitializeComponent();
-        ActivityDots.CollapseCompleted += ActivityDotsOnCollapseCompleted;
 
         SourceInitialized += (_, _) =>
         {
@@ -81,17 +80,7 @@ public partial class TaskbarLabelWindow : Window
         }
 
         _isTaskActive = isActive;
-
-        if (isActive)
-        {
-            SetActivityLayout(isExpanded: true);
-        }
-
         ActivityDots.IsActive = isActive;
-        if (!isActive && !ActivityDots.IsLoaded)
-        {
-            SetActivityLayout(isExpanded: false);
-        }
     }
 
     public void UpdateUsage(double? remainingPercent, DateTimeOffset? resetsAt)
@@ -159,25 +148,6 @@ public partial class TaskbarLabelWindow : Window
                 UpdateVisibilityAndPosition();
             },
             System.Windows.Threading.DispatcherPriority.Send);
-    }
-
-    private void ActivityDotsOnCollapseCompleted(object? sender, EventArgs e)
-    {
-        if (_isTaskActive)
-        {
-            return;
-        }
-
-        SetActivityLayout(isExpanded: false);
-    }
-
-    private void SetActivityLayout(bool isExpanded)
-    {
-        Width = isExpanded ? 102d : 94d;
-        LabelSurface.Padding = isExpanded
-            ? new Thickness(8d, 0d, 0d, 0d)
-            : new Thickness(0d);
-        Reposition();
     }
 
     private void LabelSurface_OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e) =>
