@@ -75,21 +75,32 @@ icon to refresh, change display mode, or exit.
 
 ## Codex activity hooks
 
-The taskbar dots can react to real Codex work without polling. Hook installation is
+The taskbar dots can react to real Codex work without polling. Hook installation remains
 an explicit, reviewable action and is never performed during normal widget startup.
-From PowerShell in the directory containing the widget executable, run:
+
+Select the three-dot activity button in the desktop widget, or choose **Activity dots...**
+from the tray or taskbar-label menu. The setup window reports whether the hooks are missing,
+awaiting approval, active, modified, or disabled. Select **Install hooks**, review the exact
+proposed `~/.codex/hooks.json` content, and confirm the change.
+
+After installation, select **Copy /hooks and open Codex**. Paste `/hooks` into Codex, then
+review and trust the exact new `UserPromptSubmit`, `Stop`, and `SessionEnd` definitions.
+New or changed definitions require new trust. Return to the setup window and select
+**Check again** to verify that activity reporting is ready.
+
+The setup window can also remove only handlers that exactly match the current widget
+executable. Existing hooks and unknown configuration fields are preserved.
+
+For scripted setup or recovery, the existing command-line flow remains available. From
+PowerShell in the directory containing the widget executable, run:
 
 ```powershell
 .\CodexUsageWidget.exe --install-activity-hooks
 ```
 
-The command displays the proposed `~/.codex/hooks.json` content and writes it only
-after interactive confirmation. It preserves existing hooks and unknown fields.
-After installation, start Codex, open `/hooks`, and review and trust the exact new
-`UserPromptSubmit`, `Stop`, and `SessionEnd` definitions. New or changed definitions
-require new trust.
+The command displays the proposed content and writes it only after interactive confirmation.
 
-To remove only handlers that exactly match the current widget executable, run:
+To perform the equivalent removal from PowerShell, run:
 
 ```powershell
 .\CodexUsageWidget.exe --uninstall-activity-hooks

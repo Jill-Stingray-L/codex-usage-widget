@@ -149,6 +149,7 @@
             <ContextMenu>
                 <MenuItem Header="Open widget" Click="OpenMenuItem_OnClick" />
                 <MenuItem Header="Refresh" Click="RefreshMenuItem_OnClick" />
+                <MenuItem Header="Activity dots..." Click="ActivityDotsMenuItem_OnClick" />
                 <MenuItem x:Name="ActivityPreviewMenuItem"
                           Header="Preview activity animation"
                           IsCheckable="True"

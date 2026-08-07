@@ -35,15 +35,24 @@ public partial class App : System.Windows.Application, IDisposable
         CodexActivityMonitor? activityMonitor = null;
         try
         {
-            var usageProvider = new CodexUsageProvider(new CodexAppServerSession());
+            var appServerSession = new CodexAppServerSession();
+            var usageProvider = new CodexUsageProvider(appServerSession);
             var usageMonitor = new UsageMonitor(usageProvider);
             usageMonitor.DiagnosticMessage += (_, message) => _logger.Info(message);
 
             activityMonitor = new CodexActivityMonitor(new CodexActivityPipeSignalSource());
+            var processPath = Environment.ProcessPath ??
+                throw new InvalidOperationException("Cannot determine the widget executable path.");
+            var activityHookSetupService = new CodexActivityHookSetupService(
+                new CodexHookConfigurationManager(),
+                appServerSession,
+                processPath);
 
             var window = new MainWindow(
                 usageMonitor,
                 activityMonitor,
+                activityHookSetupService,
+                new CodexCliLauncher(),
                 new DisplayModeStore(),
                 new WidgetDensityStore(),
                 new TrayIconService());

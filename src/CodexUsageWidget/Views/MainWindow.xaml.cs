@@ -20,6 +20,7 @@ public partial class MainWindow : Window
 
     private readonly UsageMonitor _usageMonitor;
     private readonly CodexActivityMonitor _activityMonitor;
+    private readonly ActivityHookSetupWindowController _activityHookSetupWindows;
     private readonly DisplayModeStore _displayModeStore;
     private readonly WidgetDensityStore _densityStore;
     private readonly TrayIconService _trayIcon;
@@ -33,12 +34,18 @@ public partial class MainWindow : Window
     public MainWindow(
         UsageMonitor usageMonitor,
         CodexActivityMonitor activityMonitor,
+        IActivityHookSetupService activityHookSetupService,
+        ICodexLauncher codexLauncher,
         DisplayModeStore displayModeStore,
         WidgetDensityStore densityStore,
         TrayIconService trayIcon)
     {
         _usageMonitor = usageMonitor;
         _activityMonitor = activityMonitor;
+        _activityHookSetupWindows = new ActivityHookSetupWindowController(
+            this,
+            activityHookSetupService,
+            codexLauncher);
         _displayModeStore = displayModeStore;
         _densityStore = densityStore;
         _trayIcon = trayIcon;
@@ -64,12 +71,21 @@ public partial class MainWindow : Window
         _usageMonitor.SnapshotUpdated += UsageMonitorOnSnapshotUpdated;
         _usageMonitor.RefreshFailed += UsageMonitorOnRefreshFailed;
         _activityMonitor.ActivityChanged += ActivityMonitorOnActivityChanged;
+        _activityHookSetupWindows.Closed += (_, _) =>
+        {
+            if (_displayMode == WidgetDisplayMode.TaskbarIndicator)
+            {
+                Hide();
+            }
+        };
 
         _taskbarLabel.OpenRequested += (_, _) =>
             Dispatcher.BeginInvoke(_widgetVisibility.Show, DispatcherPriority.ApplicationIdle);
         _taskbarLabel.ToggleRequested += (_, _) => _widgetVisibility.Toggle();
         _taskbarLabel.RefreshRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => _ = _usageMonitor.RefreshAsync());
+        _taskbarLabel.ActivityDotsSetupRequested += (_, _) =>
+            Dispatcher.BeginInvoke(ShowActivityHookSetup);
         _taskbarLabel.DesktopModeRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget));
         _taskbarLabel.ExitRequested += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
@@ -77,6 +93,8 @@ public partial class MainWindow : Window
         _trayIcon.OpenRequested += (_, _) => Dispatcher.BeginInvoke(_widgetVisibility.Show);
         _trayIcon.RefreshRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => _ = _usageMonitor.RefreshAsync());
+        _trayIcon.ActivityDotsSetupRequested += (_, _) =>
+            Dispatcher.BeginInvoke(ShowActivityHookSetup);
         _trayIcon.DesktopModeRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget));
         _trayIcon.TaskbarModeRequested += (_, _) =>
@@ -207,6 +225,16 @@ public partial class MainWindow : Window
         }
     }
 
+    private void ShowActivityHookSetup()
+    {
+        if (!IsVisible)
+        {
+            ShowWidget();
+        }
+
+        _activityHookSetupWindows.Show();
+    }
+
     private void SetDisplayMode(WidgetDisplayMode mode)
     {
         _displayMode = mode;
@@ -254,6 +282,9 @@ public partial class MainWindow : Window
 
     private void DensityButton_OnClick(object sender, RoutedEventArgs e) => ToggleDensity();
 
+    private void ActivityDotsButton_OnClick(object sender, RoutedEventArgs e) =>
+        ShowActivityHookSetup();
+
     private void HideButton_OnClick(object sender, RoutedEventArgs e) =>
         SetDisplayMode(WidgetDisplayMode.TaskbarIndicator);
 
@@ -261,7 +292,8 @@ public partial class MainWindow : Window
 
     private void MainWindowOnDeactivated(object? sender, EventArgs e)
     {
-        if (_displayMode == WidgetDisplayMode.TaskbarIndicator)
+        if (_displayMode == WidgetDisplayMode.TaskbarIndicator &&
+            !_activityHookSetupWindows.IsOpen)
         {
             _widgetVisibility.HideOnDeactivated(_taskbarLabel.IsPointerOver);
         }

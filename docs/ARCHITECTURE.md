@@ -21,8 +21,8 @@ tests/CodexUsageWidget.Tests/ Unit tests for parsing, formatting and persistence
 
 ## Runtime flow
 
-1. `App` handles activity-hook/configuration command modes before acquiring the
-   single-instance mutex, then constructs the normal widget object graph.
+1. `Program` handles activity-hook/configuration command modes before WPF startup;
+   `App` then acquires the single-instance mutex and constructs the normal widget object graph.
 2. `UsageMonitor` owns refresh scheduling, timeout handling and refresh coalescing.
 3. `CodexUsageProvider` coordinates required rate-limit reads and optional token-activity reads.
 4. `CodexAppServerSession` owns initialized app-server connection lifetime.
@@ -31,8 +31,12 @@ tests/CodexUsageWidget.Tests/ Unit tests for parsing, formatting and persistence
 7. `CodexActivityPipeSignalSource` receives minimal lifecycle signals over a
    current-user-only named pipe; `CodexActivityMonitor` owns the active turn set and
    emits only final boolean transitions.
-8. `UsageWidgetViewModel` maps snapshots to immutable presentation state.
-9. `MainWindow` remains a window-lifecycle shell while focused user controls render
+8. `CodexActivityHookSetupService` coordinates reviewable hook-file changes and reads
+   trust state through `hooks/list`; `CodexHookTrustStatusParser` owns the protocol shape.
+9. `ActivityHookSetupWindow` presents setup status while a separate review dialog shows
+   the exact proposed file content before installation or removal.
+10. `UsageWidgetViewModel` maps snapshots to immutable presentation state.
+11. `MainWindow` remains a window-lifecycle shell while focused user controls render
    compact, detailed, and repeated limit-row content.
 
 ## Dependency direction
@@ -52,6 +56,9 @@ tests/CodexUsageWidget.Tests/ Unit tests for parsing, formatting and persistence
 - A semaphore prevents concurrent refreshes and a mutex prevents duplicate apps.
 - Activity hook IPC is bounded and local to the current Windows user. Duplicate turn
   lifecycle events are idempotent and session end removes only that session's turns.
+- UI hook setup reuses the same compare-before-write configuration plan as the CLI flow.
+  Codex remains the owner of hook trust; the widget only reads trust state and opens the
+  interactive CLI for the user's explicit `/hooks` approval.
 - Activity state is not persisted or reconstructed with polling. Missing cleanup after
   a hard Codex crash is cleared by restarting the widget.
 - Unhandled exceptions and CLI diagnostics are recorded locally for support.

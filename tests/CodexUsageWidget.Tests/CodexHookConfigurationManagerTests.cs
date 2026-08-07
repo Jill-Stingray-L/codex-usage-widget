@@ -26,6 +26,9 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
         Assert.Single(hooks["UserPromptSubmit"]!.AsArray());
         Assert.Single(hooks["Stop"]!.AsArray());
         Assert.Single(hooks["SessionEnd"]!.AsArray());
+        var content = File.ReadAllText(HooksPath);
+        Assert.Contains("& '", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("\\u0026", content, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -215,6 +218,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
         var plan = CreateManager().PlanInstall(WidgetPath());
 
         Assert.Contains("explicitly disabled", plan.Error, StringComparison.Ordinal);
+        Assert.Equal(CodexHookConfigurationErrorKind.HooksDisabled, plan.ErrorKind);
         Assert.False(plan.HasChanges);
     }
 

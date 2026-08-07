@@ -1,5 +1,6 @@
 using System.IO;
 using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using System.Text.RegularExpressions;
@@ -11,7 +12,11 @@ public sealed partial class CodexHookConfigurationManager
     private const int HookTimeoutSeconds = 3;
     private const int LegacyHookTimeoutSeconds = 1;
     private static readonly string[] ActivityEvents = ["UserPromptSubmit", "Stop", "SessionEnd"];
-    private static readonly JsonSerializerOptions IndentedJson = new() { WriteIndented = true };
+    private static readonly JsonSerializerOptions IndentedJson = new()
+    {
+        WriteIndented = true,
+        Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
 
     private readonly string _hooksPath;
     private readonly string _configPath;
@@ -29,13 +34,15 @@ public sealed partial class CodexHookConfigurationManager
     {
         if (string.IsNullOrWhiteSpace(processPath) || !Path.IsPathFullyQualified(processPath))
         {
-            return ErrorPlan("The widget executable path must be absolute.");
+            return ErrorPlan(
+                "The widget executable path must be absolute.",
+                CodexHookConfigurationErrorKind.InvalidProcessPath);
         }
 
         var featureError = GetDisabledFeatureError();
         if (featureError is not null)
         {
-            return ErrorPlan(featureError);
+            return ErrorPlan(featureError, CodexHookConfigurationErrorKind.HooksDisabled);
         }
 
         return PlanChange(processPath, install: true);
@@ -45,7 +52,9 @@ public sealed partial class CodexHookConfigurationManager
     {
         if (string.IsNullOrWhiteSpace(processPath) || !Path.IsPathFullyQualified(processPath))
         {
-            return ErrorPlan("The widget executable path must be absolute.");
+            return ErrorPlan(
+                "The widget executable path must be absolute.",
+                CodexHookConfigurationErrorKind.InvalidProcessPath);
         }
 
         return PlanChange(processPath, install: false);
@@ -131,6 +140,7 @@ public sealed partial class CodexHookConfigurationManager
         {
             return ErrorPlan(
                 $"Cannot safely modify '{_hooksPath}': {ex.Message}",
+                CodexHookConfigurationErrorKind.InvalidConfiguration,
                 originalExisted,
                 originalContent);
         }
@@ -139,6 +149,7 @@ public sealed partial class CodexHookConfigurationManager
         {
             return ErrorPlan(
                 $"Cannot safely modify '{_hooksPath}': 'hooks' is not a JSON object.",
+                CodexHookConfigurationErrorKind.InvalidConfiguration,
                 originalExisted,
                 originalContent);
         }
@@ -164,6 +175,7 @@ public sealed partial class CodexHookConfigurationManager
             {
                 return ErrorPlan(
                     $"Cannot safely modify '{_hooksPath}': hooks.{eventName} is not a JSON array.",
+                    CodexHookConfigurationErrorKind.InvalidConfiguration,
                     originalExisted,
                     originalContent);
             }
@@ -217,7 +229,8 @@ public sealed partial class CodexHookConfigurationManager
             proposedContent,
             error: null,
             originalExisted,
-            originalContent);
+            originalContent,
+            CodexHookConfigurationErrorKind.None);
     }
 
     private string? GetDisabledFeatureError()
@@ -330,10 +343,12 @@ public sealed partial class CodexHookConfigurationManager
             proposedContent: originalContent ?? string.Empty,
             error: null,
             originalExisted,
-            originalContent);
+            originalContent,
+            CodexHookConfigurationErrorKind.None);
 
     private static CodexHookConfigurationPlan ErrorPlan(
         string error,
+        CodexHookConfigurationErrorKind errorKind,
         bool originalExisted = false,
         string? originalContent = null) =>
         new(
@@ -341,7 +356,8 @@ public sealed partial class CodexHookConfigurationManager
             proposedContent: originalContent ?? string.Empty,
             error,
             originalExisted,
-            originalContent);
+            originalContent,
+            errorKind);
 
     [GeneratedRegex(@"^\s*\[[^\]]+\]\s*(?:#.*)?$")]
     private static partial Regex TomlSectionRegex();
@@ -353,6 +369,14 @@ public sealed partial class CodexHookConfigurationManager
     private static partial Regex DisabledHooksRegex();
 }
 
+public enum CodexHookConfigurationErrorKind
+{
+    None,
+    HooksDisabled,
+    InvalidProcessPath,
+    InvalidConfiguration
+}
+
 public sealed class CodexHookConfigurationPlan
 {
     internal CodexHookConfigurationPlan(
@@ -360,13 +384,15 @@ public sealed class CodexHookConfigurationPlan
         string proposedContent,
         string? error,
         bool originalExisted,
-        string? originalContent)
+        string? originalContent,
+        CodexHookConfigurationErrorKind errorKind)
     {
         HasChanges = hasChanges;
         ProposedContent = proposedContent;
         Error = error;
         OriginalExisted = originalExisted;
         OriginalContent = originalContent;
+        ErrorKind = errorKind;
     }
 
     public bool HasChanges { get; }
@@ -374,6 +400,8 @@ public sealed class CodexHookConfigurationPlan
     public string ProposedContent { get; }
 
     public string? Error { get; }
+
+    public CodexHookConfigurationErrorKind ErrorKind { get; }
 
     internal bool OriginalExisted { get; }
 

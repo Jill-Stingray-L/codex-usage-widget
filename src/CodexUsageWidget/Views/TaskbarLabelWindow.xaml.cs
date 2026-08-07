@@ -57,6 +57,8 @@ public partial class TaskbarLabelWindow : Window
 
     public event EventHandler? RefreshRequested;
 
+    public event EventHandler? ActivityDotsSetupRequested;
+
     public event EventHandler? DesktopModeRequested;
 
     public event EventHandler? ExitRequested;
@@ -218,6 +220,9 @@ public partial class TaskbarLabelWindow : Window
 
     private void RefreshMenuItem_OnClick(object sender, RoutedEventArgs e) =>
         RefreshRequested?.Invoke(this, EventArgs.Empty);
+
+    private void ActivityDotsMenuItem_OnClick(object sender, RoutedEventArgs e) =>
+        ActivityDotsSetupRequested?.Invoke(this, EventArgs.Empty);
 
     private void ActivityPreviewMenuItem_OnClick(object sender, RoutedEventArgs e)
     {

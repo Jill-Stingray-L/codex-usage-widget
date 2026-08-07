@@ -5,6 +5,31 @@
     <SolidColorBrush x:Key="TextTertiary" Color="#969696" />
     <SolidColorBrush x:Key="CardBackground" Color="#292929" />
     <SolidColorBrush x:Key="CardBorder" Color="#343434" />
+    <Color x:Key="AccentPrimaryColor">#3B78D8</Color>
+    <Color x:Key="AccentPrimaryBorderColor">#5B91E5</Color>
+    <Color x:Key="AccentPrimaryHoverColor">#4A88E8</Color>
+    <Color x:Key="AccentPrimaryHoverBorderColor">#76ADF2</Color>
+    <Color x:Key="AccentPrimaryPressedColor">#2E63B5</Color>
+    <Color x:Key="AccentDataColor">#75A7F0</Color>
+    <SolidColorBrush x:Key="AccentPrimaryBrush" Color="{StaticResource AccentPrimaryColor}" />
+    <SolidColorBrush x:Key="AccentPrimaryBorderBrush" Color="{StaticResource AccentPrimaryBorderColor}" />
+    <SolidColorBrush x:Key="AccentDataBrush" Color="{StaticResource AccentDataColor}" />
+    <CubicEase x:Key="DialogButtonEaseOut" EasingMode="EaseOut" />
+
+    <Style x:Key="DialogWindow" TargetType="Window">
+        <Setter Property="WindowStyle" Value="None" />
+        <Setter Property="AllowsTransparency" Value="True" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="ShowInTaskbar" Value="False" />
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+    </Style>
+
+    <Style x:Key="DialogSurface" TargetType="Border">
+        <Setter Property="Background" Value="#1F1F1F" />
+        <Setter Property="BorderBrush" Value="#424242" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="10" />
+    </Style>
 
     <Style x:Key="IconButton" TargetType="Button">
         <Setter Property="Width" Value="28" />
@@ -44,6 +69,170 @@
         <Setter Property="CornerRadius" Value="10" />
         <Setter Property="Padding" Value="12" />
         <Setter Property="Margin" Value="0,0,0,10" />
+    </Style>
+
+    <Style x:Key="DialogButton" TargetType="Button">
+        <Setter Property="MinWidth" Value="88" />
+        <Setter Property="Height" Value="32" />
+        <Setter Property="Padding" Value="14,0" />
+        <Setter Property="Foreground" Value="{StaticResource TextPrimary}" />
+        <Setter Property="Background" Value="#343434" />
+        <Setter Property="BorderBrush" Value="#454545" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="ButtonSurface"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="7">
+                        <Border.Background>
+                            <SolidColorBrush Color="#343434" />
+                        </Border.Background>
+                        <Border.BorderBrush>
+                            <SolidColorBrush Color="#454545" />
+                        </Border.BorderBrush>
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal">
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetName="ButtonSurface"
+                                                        Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                        To="#343434"
+                                                        Duration="0:0:0.14"
+                                                        EasingFunction="{StaticResource DialogButtonEaseOut}" />
+                                        <DoubleAnimation Storyboard.TargetName="ButtonSurface"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.14" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="MouseOver">
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetName="ButtonSurface"
+                                                        Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                        To="#414141"
+                                                        Duration="0:0:0.14"
+                                                        EasingFunction="{StaticResource DialogButtonEaseOut}" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetName="ButtonSurface"
+                                                        Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                        To="#292929"
+                                                        Duration="0:0:0.07"
+                                                        EasingFunction="{StaticResource DialogButtonEaseOut}" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ButtonSurface"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0.45"
+                                                         Duration="0:0:0.14" />
+                                    </Storyboard>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="PrimaryDialogButton"
+           TargetType="Button"
+           BasedOn="{StaticResource DialogButton}">
+        <Setter Property="Background" Value="{StaticResource AccentPrimaryBrush}" />
+        <Setter Property="BorderBrush" Value="{StaticResource AccentPrimaryBorderBrush}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="ButtonSurface"
+                            BorderThickness="{TemplateBinding BorderThickness}"
+                            CornerRadius="7">
+                        <Border.Background>
+                            <SolidColorBrush Color="{StaticResource AccentPrimaryColor}" />
+                        </Border.Background>
+                        <Border.BorderBrush>
+                            <SolidColorBrush Color="{StaticResource AccentPrimaryBorderColor}" />
+                        </Border.BorderBrush>
+                        <VisualStateManager.VisualStateGroups>
+                            <VisualStateGroup x:Name="CommonStates">
+                                <VisualState x:Name="Normal">
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetName="ButtonSurface"
+                                                        Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                        To="{StaticResource AccentPrimaryColor}"
+                                                        Duration="0:0:0.14"
+                                                        EasingFunction="{StaticResource DialogButtonEaseOut}" />
+                                        <ColorAnimation Storyboard.TargetName="ButtonSurface"
+                                                        Storyboard.TargetProperty="(Border.BorderBrush).(SolidColorBrush.Color)"
+                                                        To="{StaticResource AccentPrimaryBorderColor}"
+                                                        Duration="0:0:0.14"
+                                                        EasingFunction="{StaticResource DialogButtonEaseOut}" />
+                                        <DoubleAnimation Storyboard.TargetName="ButtonSurface"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="1"
+                                                         Duration="0:0:0.14" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="MouseOver">
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetName="ButtonSurface"
+                                                        Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                        To="{StaticResource AccentPrimaryHoverColor}"
+                                                        Duration="0:0:0.14"
+                                                        EasingFunction="{StaticResource DialogButtonEaseOut}" />
+                                        <ColorAnimation Storyboard.TargetName="ButtonSurface"
+                                                        Storyboard.TargetProperty="(Border.BorderBrush).(SolidColorBrush.Color)"
+                                                        To="{StaticResource AccentPrimaryHoverBorderColor}"
+                                                        Duration="0:0:0.14"
+                                                        EasingFunction="{StaticResource DialogButtonEaseOut}" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Pressed">
+                                    <Storyboard>
+                                        <ColorAnimation Storyboard.TargetName="ButtonSurface"
+                                                        Storyboard.TargetProperty="(Border.Background).(SolidColorBrush.Color)"
+                                                        To="{StaticResource AccentPrimaryPressedColor}"
+                                                        Duration="0:0:0.07"
+                                                        EasingFunction="{StaticResource DialogButtonEaseOut}" />
+                                        <ColorAnimation Storyboard.TargetName="ButtonSurface"
+                                                        Storyboard.TargetProperty="(Border.BorderBrush).(SolidColorBrush.Color)"
+                                                        To="{StaticResource AccentPrimaryColor}"
+                                                        Duration="0:0:0.07"
+                                                        EasingFunction="{StaticResource DialogButtonEaseOut}" />
+                                    </Storyboard>
+                                </VisualState>
+                                <VisualState x:Name="Disabled">
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="ButtonSurface"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0.45"
+                                                         Duration="0:0:0.14" />
+                                    </Storyboard>
+                                </VisualState>
+                            </VisualStateGroup>
+                        </VisualStateManager.VisualStateGroups>
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          Margin="{TemplateBinding Padding}"
+                                          VerticalAlignment="Center" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="DangerDialogButton"
+           TargetType="Button"
+           BasedOn="{StaticResource DialogButton}">
+        <Setter Property="Foreground" Value="#F0B3B8" />
     </Style>
 
     <Style x:Key="SectionTitle" TargetType="TextBlock">
@@ -141,6 +330,128 @@
                                           Style="{StaticResource SlimScrollPageButton}" />
                         </Track.IncreaseRepeatButton>
                     </Track>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SlimHorizontalScrollThumb" TargetType="Thumb">
+        <Setter Property="Height" Value="3" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="Background" Value="#646464" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Thumb">
+                    <Border x:Name="ThumbSurface"
+                            Height="{TemplateBinding Height}"
+                            VerticalAlignment="Center"
+                            Background="{TemplateBinding Background}"
+                            CornerRadius="1.5" />
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="ThumbSurface" Property="Background" Value="#858585" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SlimHorizontalScrollBar" TargetType="ScrollBar">
+        <Setter Property="Height" Value="5" />
+        <Setter Property="MinHeight" Value="0" />
+        <Setter Property="MaxHeight" Value="5" />
+        <Setter Property="Orientation" Value="Horizontal" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollBar">
+                    <Track x:Name="PART_Track"
+                           Orientation="Horizontal"
+                           IsDirectionReversed="False"
+                           Focusable="False"
+                           Minimum="{TemplateBinding Minimum}"
+                           Maximum="{TemplateBinding Maximum}"
+                           Value="{TemplateBinding Value}"
+                           ViewportSize="{TemplateBinding ViewportSize}">
+                        <Track.DecreaseRepeatButton>
+                            <RepeatButton Command="ScrollBar.PageLeftCommand"
+                                          Style="{StaticResource SlimScrollPageButton}" />
+                        </Track.DecreaseRepeatButton>
+                        <Track.Thumb>
+                            <Thumb Style="{StaticResource SlimHorizontalScrollThumb}" />
+                        </Track.Thumb>
+                        <Track.IncreaseRepeatButton>
+                            <RepeatButton Command="ScrollBar.PageRightCommand"
+                                          Style="{StaticResource SlimScrollPageButton}" />
+                        </Track.IncreaseRepeatButton>
+                    </Track>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="SlimBidirectionalScrollViewer" TargetType="ScrollViewer">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ScrollViewer">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <ScrollContentPresenter x:Name="PART_ScrollContentPresenter"
+                                                Content="{TemplateBinding Content}"
+                                                ContentTemplate="{TemplateBinding ContentTemplate}"
+                                                CanContentScroll="{TemplateBinding CanContentScroll}"
+                                                Margin="{TemplateBinding Padding}"
+                                                SnapsToDevicePixels="{TemplateBinding SnapsToDevicePixels}" />
+                        <ScrollBar x:Name="PART_VerticalScrollBar"
+                                   Grid.Column="1"
+                                   Margin="4,0,0,0"
+                                   Maximum="{TemplateBinding ScrollableHeight}"
+                                   ViewportSize="{TemplateBinding ViewportHeight}"
+                                   Value="{TemplateBinding VerticalOffset}"
+                                   Visibility="{TemplateBinding ComputedVerticalScrollBarVisibility}"
+                                   Style="{StaticResource SlimVerticalScrollBar}" />
+                        <ScrollBar x:Name="PART_HorizontalScrollBar"
+                                   Grid.Row="1"
+                                   Margin="0,4,0,0"
+                                   Maximum="{TemplateBinding ScrollableWidth}"
+                                   ViewportSize="{TemplateBinding ViewportWidth}"
+                                   Value="{TemplateBinding HorizontalOffset}"
+                                   Visibility="{TemplateBinding ComputedHorizontalScrollBarVisibility}"
+                                   Style="{StaticResource SlimHorizontalScrollBar}" />
+                    </Grid>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="CodePreviewTextBox" TargetType="TextBox">
+        <Setter Property="IsReadOnly" Value="True" />
+        <Setter Property="AcceptsReturn" Value="True" />
+        <Setter Property="AcceptsTab" Value="True" />
+        <Setter Property="TextWrapping" Value="NoWrap" />
+        <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto" />
+        <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto" />
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Foreground" Value="#D8D8D8" />
+        <Setter Property="FontFamily" Value="Cascadia Mono, Consolas" />
+        <Setter Property="FontSize" Value="11.5" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="TextBox">
+                    <ScrollViewer x:Name="PART_ContentHost"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Auto"
+                                  Style="{StaticResource SlimBidirectionalScrollViewer}" />
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
