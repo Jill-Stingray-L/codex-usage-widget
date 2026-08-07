@@ -29,6 +29,8 @@ public partial class MainWindow : Window
     private WidgetDisplayMode _displayMode;
     private WidgetDensity _density;
     private UsageWidgetViewModel _viewModel = UsageWidgetViewModel.Loading();
+    private bool _isRealActivityActive;
+    private bool _isActivityPreviewEnabled;
     private bool _allowClose;
 
     public MainWindow(
@@ -86,6 +88,12 @@ public partial class MainWindow : Window
             Dispatcher.BeginInvoke(() => _ = _usageMonitor.RefreshAsync());
         _taskbarLabel.ActivityDotsSetupRequested += (_, _) =>
             Dispatcher.BeginInvoke(ShowActivityHookSetup);
+        _taskbarLabel.ActivityPreviewChanged += (_, _) =>
+            Dispatcher.BeginInvoke(() =>
+            {
+                _isActivityPreviewEnabled = _taskbarLabel.IsActivityPreviewEnabled;
+                ApplyActivityIndicatorState();
+            });
         _taskbarLabel.DesktopModeRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget));
         _taskbarLabel.ExitRequested += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
@@ -124,7 +132,18 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(() => RenderError(message));
 
     private void ActivityMonitorOnActivityChanged(bool isActive) =>
-        Dispatcher.BeginInvoke(() => _taskbarLabel.SetActivityState(isActive));
+        Dispatcher.BeginInvoke(() =>
+        {
+            _isRealActivityActive = isActive;
+            ApplyActivityIndicatorState();
+        });
+
+    private void ApplyActivityIndicatorState()
+    {
+        var isActive = _isRealActivityActive || _isActivityPreviewEnabled;
+        WidgetActivityDots.IsActive = isActive;
+        _taskbarLabel.SetActivityState(isActive);
+    }
 
     private void RenderSnapshot(UsageSnapshot snapshot)
     {

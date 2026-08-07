@@ -44,11 +44,19 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel VerticalAlignment="Center">
-                    <TextBlock Text="Codex"
-                               FontFamily="{StaticResource UiFont}"
-                               FontSize="13.5"
-                               FontWeight="SemiBold"
-                               Foreground="{StaticResource TextPrimary}" />
+                    <StackPanel Orientation="Horizontal">
+                        <TextBlock Text="Codex"
+                                   FontFamily="{StaticResource UiFont}"
+                                   FontSize="13.5"
+                                   FontWeight="SemiBold"
+                                   Foreground="{StaticResource TextPrimary}" />
+                        <controls:ActivityDotsIndicator x:Name="WidgetActivityDots"
+                                                        Margin="18,0,0,0"
+                                                        VerticalAlignment="Center"
+                                                        ToolTip="Codex task is running"
+                                                        AutomationProperties.Name="Codex task is running"
+                                                        DotBrush="{StaticResource AccentDataBrush}" />
+                    </StackPanel>
                     <StackPanel Orientation="Horizontal" Margin="0,1,0,0">
                         <Ellipse Width="5"
                                  Height="5"
