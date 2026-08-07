@@ -16,6 +16,9 @@
     <RepositoryUrl>https://github.com/ognjeeen/codex-usage-widget</RepositoryUrl>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
   </PropertyGroup>
+  <PropertyGroup Condition="'$(EnableActivityPreview)' == 'true'">
+    <DefineConstants>$(DefineConstants);ACTIVITY_PREVIEW</DefineConstants>
+  </PropertyGroup>
   <ItemGroup>
     <None Include="..\..\LICENSE" Link="LICENSE" CopyToPublishDirectory="PreserveNewest" />
     <None Include="..\..\README.md" Link="README.md" CopyToPublishDirectory="PreserveNewest" />

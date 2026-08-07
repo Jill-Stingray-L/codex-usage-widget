@@ -39,6 +39,7 @@
                 <MenuItem x:Name="ActivityPreviewMenuItem"
                           Header="Preview activity animation"
                           IsCheckable="True"
+                          Visibility="Collapsed"
                           Click="ActivityPreviewMenuItem_OnClick" />
                 <Separator />
                 <MenuItem Header="Use desktop widget" Click="DesktopModeMenuItem_OnClick" />

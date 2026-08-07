@@ -22,6 +22,10 @@ public partial class TaskbarLabelWindow : Window
     {
         InitializeComponent();
 
+#if DEBUG || ACTIVITY_PREVIEW
+        ActivityPreviewMenuItem.Visibility = Visibility.Visible;
+#endif
+
         SourceInitialized += (_, _) =>
         {
             _windowHandle = new WindowInteropHelper(this).Handle;

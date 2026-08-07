@@ -86,7 +86,6 @@ widget, without polling Codex or estimating activity from rate-limit changes.
 - Independent tracking of parallel turns, so one completed turn cannot hide another
   turn that is still running
 - A completion animation only after the final active turn finishes
-- A temporary taskbar preview for checking the animation without changing saved settings
 - A dedicated setup window for installation status, trust approval, refresh, and removal
 
 ### Private and local by design
