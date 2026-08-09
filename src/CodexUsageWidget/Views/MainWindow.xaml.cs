@@ -23,15 +23,17 @@ public partial class MainWindow : Window
     private readonly ActivityHookSetupWindowController _activityHookSetupWindows;
     private readonly DisplayModeStore _displayModeStore;
     private readonly WidgetDensityStore _densityStore;
+    private readonly StartupRegistrationService _startupRegistration;
     private readonly TrayIconService _trayIcon;
     private readonly TaskbarLabelWindow _taskbarLabel = new();
     private readonly WidgetVisibilityController _widgetVisibility;
+    private readonly MainWindowCloseState _closeState = new();
     private WidgetDisplayMode _displayMode;
     private WidgetDensity _density;
     private UsageWidgetViewModel _viewModel = UsageWidgetViewModel.Loading();
     private bool _isRealActivityActive;
     private bool _isActivityPreviewEnabled;
-    private bool _allowClose;
+    private bool _shutdownStarted;
 
     public MainWindow(
         UsageMonitor usageMonitor,
@@ -40,6 +42,7 @@ public partial class MainWindow : Window
         ICodexLauncher codexLauncher,
         DisplayModeStore displayModeStore,
         WidgetDensityStore densityStore,
+        StartupRegistrationService startupRegistration,
         TrayIconService trayIcon)
     {
         _usageMonitor = usageMonitor;
@@ -50,6 +53,7 @@ public partial class MainWindow : Window
             codexLauncher);
         _displayModeStore = displayModeStore;
         _densityStore = densityStore;
+        _startupRegistration = startupRegistration;
         _trayIcon = trayIcon;
         _displayMode = displayModeStore.Load();
         _density = densityStore.Load();
@@ -96,6 +100,8 @@ public partial class MainWindow : Window
             });
         _taskbarLabel.DesktopModeRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget));
+        _taskbarLabel.StartupToggleRequested += (_, _) =>
+            Dispatcher.BeginInvoke(ToggleStartupRegistration);
         _taskbarLabel.ExitRequested += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
 
         _trayIcon.OpenRequested += (_, _) => Dispatcher.BeginInvoke(_widgetVisibility.Show);
@@ -107,6 +113,8 @@ public partial class MainWindow : Window
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget));
         _trayIcon.TaskbarModeRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.TaskbarIndicator));
+        _trayIcon.StartupToggleRequested += (_, _) =>
+            Dispatcher.BeginInvoke(ToggleStartupRegistration);
         _trayIcon.ExitRequested += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
     }
 
@@ -114,6 +122,7 @@ public partial class MainWindow : Window
     {
         PositionNearWorkAreaEdge();
         _trayIcon.SetDisplayMode(_displayMode);
+        SetStartupRegistrationState(_startupRegistration.IsEnabled);
         if (_displayMode == WidgetDisplayMode.TaskbarIndicator)
         {
             _taskbarLabel.ShowLabel();
@@ -274,6 +283,29 @@ public partial class MainWindow : Window
         Hide();
     }
 
+    private void ToggleStartupRegistration()
+    {
+        var enabled = !_startupRegistration.IsEnabled;
+        if (_startupRegistration.TrySetEnabled(enabled))
+        {
+            SetStartupRegistrationState(enabled);
+            return;
+        }
+
+        SetStartupRegistrationState(_startupRegistration.IsEnabled);
+        System.Windows.MessageBox.Show(
+            "The Windows startup preference could not be updated.",
+            "Codex Usage Widget",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+    }
+
+    private void SetStartupRegistrationState(bool enabled)
+    {
+        _taskbarLabel.SetStartupEnabled(enabled);
+        _trayIcon.SetStartupEnabled(enabled);
+    }
+
     private void Widget_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ButtonState != MouseButtonState.Pressed ||
@@ -323,24 +355,36 @@ public partial class MainWindow : Window
 
     private void ExitApplication()
     {
-        _allowClose = true;
+        _closeState.RequestExplicitExit();
         Close();
     }
 
+    internal void NotifySessionEnding() => _closeState.NotifySessionEnding();
+
     private void MainWindowOnClosing(object? sender, CancelEventArgs e)
     {
-        if (!_allowClose)
+        var closeAction = _closeState.GetCloseAction();
+        if (closeAction == MainWindowCloseAction.MinimizeToTaskbar)
         {
             e.Cancel = true;
             SetDisplayMode(WidgetDisplayMode.TaskbarIndicator);
             return;
         }
 
+        if (_shutdownStarted)
+        {
+            return;
+        }
+
+        _shutdownStarted = true;
         _taskbarLabel.HideLabel();
-        _taskbarLabel.Close();
+        _taskbarLabel.CloseLabel();
         _trayIcon.Dispose();
         _activityMonitor.DisposeAsync().AsTask().GetAwaiter().GetResult();
         _usageMonitor.DisposeAsync().AsTask().GetAwaiter().GetResult();
-        System.Windows.Application.Current.Shutdown();
+        if (closeAction == MainWindowCloseAction.CloseAndShutdownApplication)
+        {
+            System.Windows.Application.Current.Shutdown();
+        }
     }
 }
