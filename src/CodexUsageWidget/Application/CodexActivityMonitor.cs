@@ -5,7 +5,8 @@ public sealed class CodexActivityMonitor : IAsyncDisposable
     private readonly object _stateLock = new();
     private readonly object _transitionLock = new();
     private readonly ICodexActivitySignalSource _source;
-    private readonly HashSet<ActiveTurn> _activeTurns = [];
+    private readonly Dictionary<string, string> _activeTurnsBySession =
+        new(StringComparer.Ordinal);
     private bool _started;
 
     public CodexActivityMonitor(ICodexActivitySignalSource source)
@@ -15,13 +16,15 @@ public sealed class CodexActivityMonitor : IAsyncDisposable
 
     public event Action<bool>? ActivityChanged;
 
+    public event EventHandler<string>? DiagnosticMessage;
+
     public bool IsActive
     {
         get
         {
             lock (_stateLock)
             {
-                return _activeTurns.Count > 0;
+                return _activeTurnsBySession.Count > 0;
             }
         }
     }
@@ -43,28 +46,44 @@ public sealed class CodexActivityMonitor : IAsyncDisposable
         lock (_transitionLock)
         {
             bool? changedState = null;
+            var recoveredOrphan = false;
             lock (_stateLock)
             {
-                var wasActive = _activeTurns.Count > 0;
+                var wasActive = _activeTurnsBySession.Count > 0;
                 switch (signal.Kind)
                 {
                     case CodexActivitySignalKind.TurnStarted when signal.TurnId is not null:
-                        _activeTurns.Add(new ActiveTurn(signal.SessionId, signal.TurnId));
+                        recoveredOrphan = _activeTurnsBySession.TryGetValue(
+                            signal.SessionId,
+                            out var previousTurnId) &&
+                            !string.Equals(previousTurnId, signal.TurnId, StringComparison.Ordinal);
+                        _activeTurnsBySession[signal.SessionId] = signal.TurnId;
                         break;
                     case CodexActivitySignalKind.TurnStopped when signal.TurnId is not null:
-                        _activeTurns.Remove(new ActiveTurn(signal.SessionId, signal.TurnId));
+                        if (_activeTurnsBySession.TryGetValue(signal.SessionId, out var activeTurnId) &&
+                            string.Equals(activeTurnId, signal.TurnId, StringComparison.Ordinal))
+                        {
+                            _activeTurnsBySession.Remove(signal.SessionId);
+                        }
+
                         break;
                     case CodexActivitySignalKind.SessionEnded:
-                        _activeTurns.RemoveWhere(turn =>
-                            string.Equals(turn.SessionId, signal.SessionId, StringComparison.Ordinal));
+                        _activeTurnsBySession.Remove(signal.SessionId);
                         break;
                 }
 
-                var currentActivity = _activeTurns.Count > 0;
+                var currentActivity = _activeTurnsBySession.Count > 0;
                 if (wasActive != currentActivity)
                 {
                     changedState = currentActivity;
                 }
+            }
+
+            if (recoveredOrphan)
+            {
+                DiagnosticMessage?.Invoke(
+                    this,
+                    "Recovered stale Codex activity state for one session.");
             }
 
             if (changedState is { } emittedActivity)
@@ -79,6 +98,4 @@ public sealed class CodexActivityMonitor : IAsyncDisposable
         _source.SignalReceived -= SourceOnSignalReceived;
         await _source.DisposeAsync().ConfigureAwait(false);
     }
-
-    private readonly record struct ActiveTurn(string SessionId, string TurnId);
 }

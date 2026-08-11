@@ -21,16 +21,19 @@ tests/CodexUsageWidget.Tests/ Unit tests for parsing, formatting and persistence
 
 ## Runtime flow
 
-1. `Program` handles activity-hook/configuration command modes before WPF startup;
-   `App` then acquires the single-instance mutex and constructs the normal widget object graph.
+1. `Program` handles activity-hook/configuration command modes before WPF startup. A normal
+   launch from a temporary ZIP location is copied atomically to a versioned per-user app
+   directory and relaunched; `App` then acquires the single-instance mutex and constructs
+   the widget object graph.
 2. `UsageMonitor` owns refresh scheduling, timeout handling and refresh coalescing.
 3. `CodexUsageProvider` coordinates required rate-limit reads and optional token-activity reads.
 4. `CodexAppServerSession` owns initialized app-server connection lifetime.
 5. `JsonRpcConnection` owns stdin/stdout request correlation and process lifetime.
 6. Endpoint-specific parsers convert Codex payloads into domain records.
-7. `CodexActivityPipeSignalSource` receives minimal lifecycle signals over a
-   current-user-only named pipe; `CodexActivityMonitor` owns the active turn set and
-   emits only final boolean transitions.
+7. A path-independent PowerShell hook bridge forwards minimal lifecycle signals to
+   `CodexActivityPipeSignalSource` over a current-user-only named pipe;
+   `CodexActivityMonitor` owns one active turn per session and emits only final boolean
+   transitions.
 8. `CodexActivityHookSetupService` coordinates reviewable hook-file changes and reads
    trust state through `hooks/list`; `CodexHookTrustStatusParser` owns the protocol shape.
 9. `ActivityHookSetupWindow` presents setup status while a separate review dialog shows
@@ -54,15 +57,18 @@ tests/CodexUsageWidget.Tests/ Unit tests for parsing, formatting and persistence
 - Optional token-activity failures degrade only the detailed activity section; core
   rate-limit monitoring remains available.
 - A semaphore prevents concurrent refreshes and a mutex prevents duplicate apps.
-- Activity hook IPC is bounded and local to the current Windows user. Accepted clients are
+- Activity hook IPC is bounded and local to the current Windows user. The hook path does not
+  depend on the release extraction directory and does not start WPF. Accepted clients are
   consumed in order with a per-client read timeout, while separate pipe instances keep parallel
-  Codex sessions connectable. Duplicate turn lifecycle events are idempotent and session end
-  removes only that session's turns.
+  Codex sessions connectable. Duplicate events are idempotent, a new turn replaces an orphaned
+  turn in the same session, late completion for the replaced turn is ignored, and session end
+  removes only that session.
 - UI hook setup reuses the same compare-before-write configuration plan as the CLI flow.
   Codex remains the owner of hook trust; the widget only reads trust state and opens the
   interactive CLI for the user's explicit `/hooks` approval.
-- Activity state is not persisted or reconstructed with polling. Missing cleanup after
-  a hard Codex crash is cleared by restarting the widget.
+- Activity state is not persisted or reconstructed with private transcript/database polling.
+  A later turn in the same session recovers missing cleanup; a hard Codex termination with no
+  later lifecycle event is cleared by restarting the widget.
 - Unhandled exceptions and CLI diagnostics are recorded locally for support.
 - Publish trimming is disabled because WPF is not a safe trimming boundary.
 

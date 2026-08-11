@@ -10,7 +10,7 @@ public static class CodexActivityPipeClient
 {
     private const int MaximumPayloadBytes = 4096;
     public const string DefaultPipeName = "CodexUsageWidget.Activity.v1";
-    public const int DefaultConnectTimeoutMilliseconds = 150;
+    public const int DefaultConnectTimeoutMilliseconds = 1000;
 
     public static async Task<bool> TrySendAsync(
         CodexActivitySignal signal,

@@ -39,9 +39,13 @@ therefore not required on the destination computer.
 
 1. Download the
    [latest Windows x64 portable release](https://github.com/ognjeeen/codex-usage-widget/releases/latest/download/codex-usage-widget-win-x64.zip).
-2. Extract the ZIP to a permanent directory.
+2. Start `CodexUsageWidget.exe`, either after extraction or directly from the ZIP.
 3. Ensure `codex --version` works in PowerShell and run `codex login` if needed.
-4. Start `CodexUsageWidget.exe`.
+
+When Windows starts the executable from a temporary ZIP location, the widget atomically
+copies that exact version to `%LOCALAPPDATA%\CodexUsageWidget\app\<version>` and relaunches
+the stable per-user copy. An executable already extracted to a normal directory continues
+to run in place.
 
 Only one instance can run at a time. Starting the executable again exits quietly.
 
@@ -74,10 +78,10 @@ consumption because tokens do not map linearly to the remaining subscription per
 Use the `−` button to switch to taskbar mode. Right-click the taskbar label or tray
 icon to refresh, change display mode, or exit.
 
-Choose **Start with Windows** from either menu to register the current portable
-executable for the signed-in Windows user. The option does not require administrator
-rights, and turning it off removes the registration. If the portable folder moves,
-the path is refreshed the next time the widget is started manually.
+Choose **Start with Windows** from either menu to register the running executable for
+the signed-in Windows user. The option does not require administrator rights, and turning
+it off removes the registration. If an extracted portable folder moves, the path is
+refreshed the next time the widget is started manually.
 
 ## Live Codex activity dots
 
@@ -89,8 +93,8 @@ widget, without polling Codex or estimating activity from rate-limit changes.
 
 - One quiet dot while Codex is idle, expanding into a three-dot wave during active work
 - Immediate, event-driven updates when a Codex turn starts or finishes
-- Independent tracking of parallel turns, so one completed turn cannot hide another
-  turn that is still running
+- Independent tracking of parallel Codex sessions, so one completed session cannot hide
+  another session that is still running
 - A completion animation only after the final active turn finishes
 - A dedicated setup window for installation status, trust approval, refresh, and removal
 
@@ -100,6 +104,8 @@ widget, without polling Codex or estimating activity from rate-limit changes.
   collected, stored, forwarded, or logged
 - No telemetry, analytics, browser automation, remote backend, or credential access is used
 - Hook signals stay on the current Windows account through a current-user-only named pipe
+- Hook handlers use a small path-independent PowerShell-to-pipe bridge and never start the
+  WPF widget executable for each lifecycle event
 - Only the lifecycle event type and the Codex-provided session and turn identifiers are
   passed to the in-memory activity monitor
 - Activity state is not persisted, so the widget does not build a history of your work
@@ -144,9 +150,11 @@ If the widget is closed, the hook handler exits successfully after a short bound
 connection attempt and Codex continues normally.
 
 Activity state is intentionally in memory only. A task that started before the widget
-or hooks were ready is not reconstructed. If Codex terminates without emitting `Stop`
-or `SessionEnd`, the indicator can remain active until the widget restarts; no arbitrary
-timeout is used because legitimate tasks can run for a long time.
+or hooks were ready is not reconstructed. Each session owns at most one active turn: a
+later `UserPromptSubmit` replaces an orphaned turn, and a late `Stop` for the old turn
+cannot clear the current one. If Codex terminates without any later lifecycle event, a
+widget restart still clears the in-memory state; no arbitrary timeout is used because
+legitimate tasks can run for a long time.
 
 ## Development
 
@@ -182,6 +190,7 @@ Maintainer release instructions are documented in
 
 The application only writes under `%LOCALAPPDATA%\CodexUsageWidget`:
 
+- `app\<version>\CodexUsageWidget.exe` — stable copy used after a direct ZIP launch
 - `display-mode.txt` — the selected display mode
 - `widget-density.txt` — the selected compact or detailed widget layout
 - `logs\codex-usage-widget-YYYYMMDD.log` — diagnostics, retained for 14 days

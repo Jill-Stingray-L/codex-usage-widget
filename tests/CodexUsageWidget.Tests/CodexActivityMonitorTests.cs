@@ -59,6 +59,48 @@ public sealed class CodexActivityMonitorTests
     }
 
     [Fact]
+    public async Task NewTurnInSameSessionReplacesOrphanedTurn()
+    {
+        await using var source = new FakeSignalSource();
+        await using var monitor = new CodexActivityMonitor(source);
+        var changes = new List<bool>();
+        string? diagnostic = null;
+        monitor.ActivityChanged += changes.Add;
+        monitor.DiagnosticMessage += (_, message) => diagnostic = message;
+        await monitor.StartAsync();
+
+        source.Publish(new(CodexActivitySignalKind.TurnStarted, "session", "aborted-turn"));
+        source.Publish(new(CodexActivitySignalKind.TurnStarted, "session", "next-turn"));
+        source.Publish(new(CodexActivitySignalKind.TurnStopped, "session", "next-turn"));
+
+        Assert.False(monitor.IsActive);
+        Assert.Equal([true, false], changes);
+        Assert.Equal("Recovered stale Codex activity state for one session.", diagnostic);
+    }
+
+    [Fact]
+    public async Task LateStopForReplacedTurnCannotStopCurrentTurn()
+    {
+        await using var source = new FakeSignalSource();
+        await using var monitor = new CodexActivityMonitor(source);
+        var changes = new List<bool>();
+        monitor.ActivityChanged += changes.Add;
+        await monitor.StartAsync();
+
+        source.Publish(new(CodexActivitySignalKind.TurnStarted, "session", "old-turn"));
+        source.Publish(new(CodexActivitySignalKind.TurnStarted, "session", "current-turn"));
+        source.Publish(new(CodexActivitySignalKind.TurnStopped, "session", "old-turn"));
+
+        Assert.True(monitor.IsActive);
+        Assert.Equal([true], changes);
+
+        source.Publish(new(CodexActivitySignalKind.TurnStopped, "session", "current-turn"));
+
+        Assert.False(monitor.IsActive);
+        Assert.Equal([true, false], changes);
+    }
+
+    [Fact]
     public async Task SessionEndRemovesOnlyTurnsFromThatSession()
     {
         await using var source = new FakeSignalSource();

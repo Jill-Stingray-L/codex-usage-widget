@@ -19,7 +19,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
     {
         var manager = CreateManager();
 
-        var plan = manager.PlanInstall(WidgetPath());
+        var plan = manager.PlanInstall();
         manager.Apply(plan);
 
         var hooks = JsonNode.Parse(File.ReadAllText(HooksPath))!["hooks"]!.AsObject();
@@ -27,8 +27,8 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
         Assert.Single(hooks["Stop"]!.AsArray());
         Assert.Single(hooks["SessionEnd"]!.AsArray());
         var content = File.ReadAllText(HooksPath);
-        Assert.Contains("& '", content, StringComparison.Ordinal);
-        Assert.DoesNotContain("\\u0026", content, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("NamedPipeClientStream", content, StringComparison.Ordinal);
+        Assert.DoesNotContain("CodexUsageWidget.exe", content, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]
@@ -46,7 +46,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
             """);
         var manager = CreateManager();
 
-        manager.Apply(manager.PlanInstall(WidgetPath()));
+        manager.Apply(manager.PlanInstall());
 
         var root = JsonNode.Parse(File.ReadAllText(HooksPath))!.AsObject();
         Assert.Equal("keep me", root["description"]!.GetValue<string>());
@@ -58,19 +58,38 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
     public void RepeatedInstallIsIdempotent()
     {
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath()));
+        manager.Apply(manager.PlanInstall());
 
-        var secondPlan = manager.PlanInstall(WidgetPath());
+        var secondPlan = manager.PlanInstall();
 
         Assert.False(secondPlan.HasChanges);
         Assert.Null(secondPlan.Error);
     }
 
     [Fact]
+    public void InstalledHandlerIsIndependentOfExecutableLocation()
+    {
+        var firstWidgetPath = WidgetPath();
+        var secondWidgetPath = Path.Combine(
+            _directory,
+            "Another Temporary Extraction",
+            "CodexUsageWidget.exe");
+        var manager = CreateManager();
+        manager.Apply(manager.PlanInstall());
+
+        var content = File.ReadAllText(HooksPath);
+        var secondPlan = manager.PlanInstall();
+
+        Assert.DoesNotContain(firstWidgetPath, content, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(secondWidgetPath, content, StringComparison.OrdinalIgnoreCase);
+        Assert.False(secondPlan.HasChanges);
+    }
+
+    [Fact]
     public void UninstallRemovesOnlyExactWidgetHandlers()
     {
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath()));
+        manager.Apply(manager.PlanInstall());
         var root = JsonNode.Parse(File.ReadAllText(HooksPath))!.AsObject();
         root["hooks"]!["Stop"]!.AsArray().Add(new JsonObject
         {
@@ -83,11 +102,11 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
         });
         File.WriteAllText(HooksPath, root.ToJsonString());
 
-        manager.Apply(manager.PlanUninstall(WidgetPath()));
+        manager.Apply(manager.PlanUninstall());
 
         var content = File.ReadAllText(HooksPath);
         Assert.DoesNotContain(
-            CodexHookConfigurationManager.BuildHookCommand(WidgetPath()),
+            CodexActivityHookBridge.Command,
             content,
             StringComparison.Ordinal);
         Assert.Contains("other-widget --codex-activity-hook", content, StringComparison.Ordinal);
@@ -101,7 +120,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
         File.WriteAllText(HooksPath, Malformed);
         var manager = CreateManager();
 
-        var plan = manager.PlanInstall(WidgetPath());
+        var plan = manager.PlanInstall();
 
         Assert.NotNull(plan.Error);
         Assert.False(plan.HasChanges);
@@ -127,7 +146,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
         startInfo.ArgumentList.Add("-NoProfile");
         startInfo.ArgumentList.Add("-NonInteractive");
         startInfo.ArgumentList.Add("-Command");
-        startInfo.ArgumentList.Add(CodexHookConfigurationManager.BuildHookCommand(hookPath));
+        startInfo.ArgumentList.Add(CodexHookConfigurationManager.BuildLegacyHookCommand(hookPath));
 
         using var process = System.Diagnostics.Process.Start(startInfo)!;
         process.WaitForExit();
@@ -138,7 +157,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
     [Fact]
     public void HookCommandDoesNotSpawnNestedPowerShell()
     {
-        var command = CodexHookConfigurationManager.BuildHookCommand(WidgetPath());
+        var command = CodexHookConfigurationManager.BuildLegacyHookCommand(WidgetPath());
 
         Assert.StartsWith("& '", command, StringComparison.Ordinal);
         Assert.DoesNotContain("powershell.exe", command, StringComparison.OrdinalIgnoreCase);
@@ -160,7 +179,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
             """);
 
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath()));
+        manager.Apply(manager.PlanInstall());
 
         var content = File.ReadAllText(HooksPath);
         Assert.DoesNotContain(legacyCommand, content, StringComparison.Ordinal);
@@ -170,9 +189,11 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
             var groups = hooks[eventName]!.AsArray();
             var handler = groups.Single()!["hooks"]!.AsArray().Single()!;
             Assert.Equal(
-                CodexHookConfigurationManager.BuildHookCommand(WidgetPath()),
+                CodexActivityHookBridge.Command,
                 handler["command"]!.GetValue<string>());
-            Assert.Equal(3, handler["timeout"]!.GetValue<int>());
+            Assert.Equal(
+                CodexActivityHookBridge.HookTimeoutSeconds,
+                handler["timeout"]!.GetValue<int>());
         }
     }
 
@@ -195,7 +216,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
             """);
 
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath()));
+        manager.Apply(manager.PlanInstall());
 
         var content = File.ReadAllText(HooksPath);
         Assert.DoesNotContain("powershell.exe", content, StringComparison.OrdinalIgnoreCase);
@@ -204,7 +225,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
         {
             var handler = hooks[eventName]!.AsArray().Single()!["hooks"]!.AsArray().Single()!;
             Assert.Equal(
-                CodexHookConfigurationManager.BuildHookCommand(WidgetPath()),
+                CodexActivityHookBridge.Command,
                 handler["command"]!.GetValue<string>());
         }
     }
@@ -216,11 +237,11 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
             _directory,
             "Old Portable's Folder",
             "CodexUsageWidget.exe");
-        var oldCommand = CodexHookConfigurationManager.BuildHookCommand(oldWidgetPath);
+        var oldCommand = CodexHookConfigurationManager.BuildLegacyHookCommand(oldWidgetPath);
         WriteActivityHandlers((oldCommand, 3));
 
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath()));
+        manager.Apply(manager.PlanInstall());
 
         var content = File.ReadAllText(HooksPath);
         Assert.DoesNotContain(oldCommand, content, StringComparison.Ordinal);
@@ -229,7 +250,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
         {
             var handler = hooks[eventName]!.AsArray().Single()!["hooks"]!.AsArray().Single()!;
             Assert.Equal(
-                CodexHookConfigurationManager.BuildHookCommand(WidgetPath()),
+                CodexActivityHookBridge.Command,
                 handler["command"]!.GetValue<string>());
         }
     }
@@ -239,7 +260,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
     {
         var oldWidgetPath = Path.Combine(_directory, "Old Folder", "CodexUsageWidget.exe");
         var escapedOldPath = oldWidgetPath.Replace("'", "''", StringComparison.Ordinal);
-        var oldPowerShellCommand = CodexHookConfigurationManager.BuildHookCommand(oldWidgetPath);
+        var oldPowerShellCommand = CodexHookConfigurationManager.BuildLegacyHookCommand(oldWidgetPath);
         var oldLegacyCommand = $"\"{oldWidgetPath}\" --codex-activity-hook";
         var oldNestedCommand = "powershell.exe -NoLogo -NoProfile -NonInteractive " +
             "-ExecutionPolicy Bypass -Command " +
@@ -250,7 +271,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
             (oldNestedCommand, 3));
 
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath()));
+        manager.Apply(manager.PlanInstall());
 
         var hooks = JsonNode.Parse(File.ReadAllText(HooksPath))!["hooks"]!.AsObject();
         foreach (var eventName in new[] { "UserPromptSubmit", "Stop", "SessionEnd" })
@@ -262,7 +283,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
                 .ToArray();
             var handler = Assert.Single(handlers);
             Assert.Equal(
-                CodexHookConfigurationManager.BuildHookCommand(WidgetPath()),
+                CodexActivityHookBridge.Command,
                 handler!["command"]!.GetValue<string>());
         }
     }
@@ -273,12 +294,12 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
         var oldWidgetPath = Path.Combine(_directory, "Old Folder", "CodexUsageWidget.exe");
         var oldLegacyCommand = $"\"{oldWidgetPath}\" --codex-activity-hook";
         WriteActivityHandlers(
-            (CodexHookConfigurationManager.BuildHookCommand(WidgetPath()), 3),
-            (CodexHookConfigurationManager.BuildHookCommand(oldWidgetPath), 3),
+            (CodexActivityHookBridge.Command, CodexActivityHookBridge.HookTimeoutSeconds),
+            (CodexHookConfigurationManager.BuildLegacyHookCommand(oldWidgetPath), 3),
             (oldLegacyCommand, 1));
         var manager = CreateManager();
 
-        manager.Apply(manager.PlanUninstall(WidgetPath()));
+        manager.Apply(manager.PlanUninstall());
 
         var content = File.ReadAllText(HooksPath);
         Assert.DoesNotContain("CodexUsageWidget.exe", content, StringComparison.OrdinalIgnoreCase);
@@ -287,12 +308,12 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
     [Fact]
     public void UninstallPreservesOtherApplicationsAndUnknownDefinitions()
     {
-        var otherCommand = CodexHookConfigurationManager.BuildHookCommand(
+        var otherCommand = CodexHookConfigurationManager.BuildLegacyHookCommand(
             Path.Combine(_directory, "OtherApp.exe"));
         var unknownCommand =
-            CodexHookConfigurationManager.BuildHookCommand(WidgetPath()) + " --unknown";
+            CodexHookConfigurationManager.BuildLegacyHookCommand(WidgetPath()) + " --unknown";
         WriteActivityHandlers(
-            (CodexHookConfigurationManager.BuildHookCommand(WidgetPath()), 3),
+            (CodexActivityHookBridge.Command, CodexActivityHookBridge.HookTimeoutSeconds),
             (otherCommand, 3),
             (unknownCommand, 3));
         var root = JsonNode.Parse(File.ReadAllText(HooksPath))!.AsObject();
@@ -310,7 +331,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
         File.WriteAllText(HooksPath, root.ToJsonString());
         var manager = CreateManager();
 
-        manager.Apply(manager.PlanUninstall(WidgetPath()));
+        manager.Apply(manager.PlanUninstall());
 
         var content = File.ReadAllText(HooksPath);
         var result = JsonNode.Parse(content)!.AsObject();
@@ -332,7 +353,7 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
         Directory.CreateDirectory(_directory);
         File.WriteAllText(ConfigPath, "[features]\nhooks = false\n");
 
-        var plan = CreateManager().PlanInstall(WidgetPath());
+        var plan = CreateManager().PlanInstall();
 
         Assert.Contains("explicitly disabled", plan.Error, StringComparison.Ordinal);
         Assert.Equal(CodexHookConfigurationErrorKind.HooksDisabled, plan.ErrorKind);
@@ -343,10 +364,10 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
     public void UninstallRemainsAvailableWhenHooksFeatureIsDisabled()
     {
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath()));
+        manager.Apply(manager.PlanInstall());
         File.WriteAllText(ConfigPath, "[features]\nhooks = false\n");
 
-        var plan = manager.PlanUninstall(WidgetPath());
+        var plan = manager.PlanUninstall();
         manager.Apply(plan);
 
         Assert.True(plan.HasChanges);

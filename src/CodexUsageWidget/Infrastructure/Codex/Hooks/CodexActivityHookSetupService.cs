@@ -6,28 +6,24 @@ public sealed class CodexActivityHookSetupService : IActivityHookSetupService
 {
     private readonly CodexHookConfigurationManager _configurationManager;
     private readonly ICodexAppServerSession _session;
-    private readonly string _processPath;
     private readonly string _workingDirectory;
 
     public CodexActivityHookSetupService(
         CodexHookConfigurationManager configurationManager,
         ICodexAppServerSession session,
-        string processPath,
         string? workingDirectory = null)
     {
-        ArgumentException.ThrowIfNullOrWhiteSpace(processPath);
         ArgumentNullException.ThrowIfNull(configurationManager);
         ArgumentNullException.ThrowIfNull(session);
         _configurationManager = configurationManager;
         _session = session;
-        _processPath = processPath;
         _workingDirectory = workingDirectory ?? Environment.CurrentDirectory;
     }
 
     public async Task<ActivityHookSetupStatus> GetStatusAsync(
         CancellationToken cancellationToken = default)
     {
-        var configurationPlan = _configurationManager.PlanInstall(_processPath);
+        var configurationPlan = _configurationManager.PlanInstall();
         if (configurationPlan.Error is not null)
         {
             var hooksDisabled = configurationPlan.ErrorKind ==
@@ -35,7 +31,7 @@ public sealed class CodexActivityHookSetupService : IActivityHookSetupService
             var hasInstalledHandlers = false;
             if (hooksDisabled)
             {
-                var uninstallPlan = _configurationManager.PlanUninstall(_processPath);
+                var uninstallPlan = _configurationManager.PlanUninstall();
                 hasInstalledHandlers = uninstallPlan.Error is null && uninstallPlan.HasChanges;
             }
 
@@ -61,7 +57,7 @@ public sealed class CodexActivityHookSetupService : IActivityHookSetupService
                 .ConfigureAwait(false);
             return FromTrustEvaluation(CodexHookTrustStatusParser.Parse(
                 result,
-                CodexHookConfigurationManager.BuildHookCommand(_processPath)));
+                CodexActivityHookBridge.Command));
         }
         catch (OperationCanceledException)
         {
@@ -103,8 +99,8 @@ public sealed class CodexActivityHookSetupService : IActivityHookSetupService
 
     private CodexHookConfigurationPlan CreatePlan(ActivityHookChangeKind kind) =>
         kind == ActivityHookChangeKind.Install
-            ? _configurationManager.PlanInstall(_processPath)
-            : _configurationManager.PlanUninstall(_processPath);
+            ? _configurationManager.PlanInstall()
+            : _configurationManager.PlanUninstall();
 
     private static void EnsureValid(CodexHookConfigurationPlan plan)
     {

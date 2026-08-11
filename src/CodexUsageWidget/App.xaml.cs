@@ -41,6 +41,7 @@ public partial class App : System.Windows.Application, IDisposable
             usageMonitor.DiagnosticMessage += (_, message) => _logger.Info(message);
 
             activityMonitor = new CodexActivityMonitor(new CodexActivityPipeSignalSource());
+            activityMonitor.DiagnosticMessage += (_, message) => _logger.Info(message);
             var processPath = Environment.ProcessPath ??
                 throw new InvalidOperationException("Cannot determine the widget executable path.");
             var startupRegistrationService = new StartupRegistrationService(processPath);
@@ -51,8 +52,7 @@ public partial class App : System.Windows.Application, IDisposable
 
             var activityHookSetupService = new CodexActivityHookSetupService(
                 new CodexHookConfigurationManager(),
-                appServerSession,
-                processPath);
+                appServerSession);
 
             var window = new MainWindow(
                 usageMonitor,

@@ -17,8 +17,6 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
 
     private string ConfigPath => Path.Combine(_directory, "config.toml");
 
-    private string WidgetPath => Path.Combine(_directory, "CodexUsageWidget.exe");
-
     [Fact]
     public async Task MissingConfigurationIsReportedWithoutStartingAppServer()
     {
@@ -44,9 +42,9 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
     {
         var session = new FakeAppServerSession();
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath));
+        manager.Apply(manager.PlanInstall());
         session.Result = CreateHooksListResult(
-            CodexHookConfigurationManager.BuildHookCommand(WidgetPath),
+            CodexActivityHookBridge.Command,
             promptStatus,
             stopStatus,
             sessionStatus);
@@ -63,9 +61,9 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
     {
         var session = new FakeAppServerSession();
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath));
+        manager.Apply(manager.PlanInstall());
         session.Result = CreateHooksListResult(
-            CodexHookConfigurationManager.BuildHookCommand(WidgetPath),
+            CodexActivityHookBridge.Command,
             "trusted",
             "trusted",
             "trusted",
@@ -81,9 +79,9 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
     {
         var session = new FakeAppServerSession();
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath));
+        manager.Apply(manager.PlanInstall());
         session.Result = CreateHooksListResult(
-            CodexHookConfigurationManager.BuildHookCommand(WidgetPath),
+            CodexActivityHookBridge.Command,
             "trusted",
             "trusted",
             "trusted",
@@ -99,9 +97,9 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
     {
         var session = new FakeAppServerSession();
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath));
+        manager.Apply(manager.PlanInstall());
         session.Result = CreateHooksListResult(
-            CodexHookConfigurationManager.BuildHookCommand(WidgetPath),
+            CodexActivityHookBridge.Command,
             "trusted",
             "trusted",
             "trusted",
@@ -122,9 +120,9 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
     {
         var session = new FakeAppServerSession();
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath));
+        manager.Apply(manager.PlanInstall());
         session.Result = CreateHooksListResult(
-            CodexHookConfigurationManager.BuildHookCommand(WidgetPath),
+            CodexActivityHookBridge.Command,
             "trusted",
             "trusted",
             "trusted",
@@ -144,7 +142,7 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
                 """{ "data": [{ "cwd": "C:\\\\work", "hooks": [], "errors": [], "warnings": [] }] }""")
         };
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath));
+        manager.Apply(manager.PlanInstall());
 
         var status = await CreateService(session).GetStatusAsync();
 
@@ -172,7 +170,7 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
     public async Task DisabledHooksWithInstalledHandlersOfferUninstallWithoutStartingAppServer()
     {
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall(WidgetPath));
+        manager.Apply(manager.PlanInstall());
         File.WriteAllText(ConfigPath, "[features]\nhooks = false\n");
         var session = new FakeAppServerSession();
 
@@ -212,7 +210,7 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
     }
 
     private CodexActivityHookSetupService CreateService(FakeAppServerSession session) =>
-        new(CreateManager(), session, WidgetPath, _directory);
+        new(CreateManager(), session, _directory);
 
     private CodexHookConfigurationManager CreateManager() => new(HooksPath, ConfigPath);
 
@@ -255,7 +253,7 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
           "handlerType": "command",
           "matcher": {{JsonSerializer.Serialize(matcher)}},
           "command": {{serializedCommand}},
-          "timeoutSec": 3,
+          "timeoutSec": {{CodexActivityHookBridge.HookTimeoutSeconds}},
           "statusMessage": null,
           "additionalContextLimit": null,
           "sourcePath": "C:\\Users\\example\\.codex\\hooks.json",

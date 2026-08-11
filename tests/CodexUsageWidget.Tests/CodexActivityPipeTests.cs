@@ -10,6 +10,51 @@ namespace CodexUsageWidget.Tests;
 public sealed class CodexActivityPipeTests
 {
     [Fact]
+    public async Task PowerShellBridgeDeliversLifecycleSignalWithoutWidgetExecutable()
+    {
+        var pipeName = UniquePipeName();
+        await using var source = new CodexActivityPipeSignalSource(pipeName);
+        var received = new TaskCompletionSource<CodexActivitySignal>(
+            TaskCreationOptions.RunContinuationsAsynchronously);
+        source.SignalReceived += signal => received.TrySetResult(signal);
+        await source.StartAsync();
+        var startInfo = new ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardInput = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true
+        };
+        startInfo.ArgumentList.Add("-NoLogo");
+        startInfo.ArgumentList.Add("-NoProfile");
+        startInfo.ArgumentList.Add("-NonInteractive");
+        startInfo.ArgumentList.Add("-Command");
+        startInfo.ArgumentList.Add(CodexActivityHookBridge.BuildCommand(pipeName));
+        using var process = Process.Start(startInfo)!;
+        var payload = JsonSerializer.Serialize(new
+        {
+            hook_event_name = "UserPromptSubmit",
+            session_id = "session",
+            turn_id = "turn"
+        });
+
+        await process.StandardInput.WriteAsync(payload);
+        process.StandardInput.Close();
+        var outputTask = process.StandardOutput.ReadToEndAsync();
+        await process.WaitForExitAsync().WaitAsync(TimeSpan.FromSeconds(
+            CodexActivityHookBridge.HookTimeoutSeconds));
+        var signal = await received.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal(0, process.ExitCode);
+        Assert.Contains("\"continue\":true", await outputTask, StringComparison.Ordinal);
+        Assert.Equal(CodexActivitySignalKind.TurnStarted, signal.Kind);
+        Assert.Equal("session", signal.SessionId);
+        Assert.Equal("turn", signal.TurnId);
+    }
+
+    [Fact]
     public async Task AcceptedStartCannotBeEmittedAfterLaterStop()
     {
         var pipeName = UniquePipeName();

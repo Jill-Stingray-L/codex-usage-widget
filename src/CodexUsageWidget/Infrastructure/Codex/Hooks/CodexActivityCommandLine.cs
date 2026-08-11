@@ -43,19 +43,11 @@ public static class CodexActivityCommandLine
 
         try
         {
-            var processPath = Environment.ProcessPath;
-            if (string.IsNullOrWhiteSpace(processPath))
-            {
-                await output.WriteLineAsync("Cannot determine the widget executable path.")
-                    .ConfigureAwait(false);
-                return 1;
-            }
-
             var manager = new CodexHookConfigurationManager();
             var install = arguments[0] == InstallArgument;
             var plan = install
-                ? manager.PlanInstall(processPath)
-                : manager.PlanUninstall(processPath);
+                ? manager.PlanInstall()
+                : manager.PlanUninstall();
             if (plan.Error is not null)
             {
                 await output.WriteLineAsync(plan.Error).ConfigureAwait(false);

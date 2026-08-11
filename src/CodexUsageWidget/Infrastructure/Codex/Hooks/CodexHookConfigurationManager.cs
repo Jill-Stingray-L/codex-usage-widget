@@ -9,13 +9,6 @@ namespace CodexUsageWidget.Infrastructure.Codex.Hooks;
 
 public sealed partial class CodexHookConfigurationManager
 {
-    private const int HookTimeoutSeconds = 3;
-    private const int LegacyHookTimeoutSeconds = 1;
-    private const string HookArgument = "--codex-activity-hook";
-    private const string WidgetExecutableName = "CodexUsageWidget.exe";
-    private const string NestedPowerShellPrefix =
-        "powershell.exe -NoLogo -NoProfile -NonInteractive " +
-        "-ExecutionPolicy Bypass -Command \"& '";
     private static readonly string[] ActivityEvents = ["UserPromptSubmit", "Stop", "SessionEnd"];
     private static readonly JsonSerializerOptions IndentedJson = new()
     {
@@ -35,35 +28,18 @@ public sealed partial class CodexHookConfigurationManager
         _configPath = configPath ?? Path.Combine(codexHome, "config.toml");
     }
 
-    public CodexHookConfigurationPlan PlanInstall(string processPath)
+    public CodexHookConfigurationPlan PlanInstall()
     {
-        if (string.IsNullOrWhiteSpace(processPath) || !Path.IsPathFullyQualified(processPath))
-        {
-            return ErrorPlan(
-                "The widget executable path must be absolute.",
-                CodexHookConfigurationErrorKind.InvalidProcessPath);
-        }
-
         var featureError = GetDisabledFeatureError();
         if (featureError is not null)
         {
             return ErrorPlan(featureError, CodexHookConfigurationErrorKind.HooksDisabled);
         }
 
-        return PlanChange(processPath, install: true);
+        return PlanChange(install: true);
     }
 
-    public CodexHookConfigurationPlan PlanUninstall(string processPath)
-    {
-        if (string.IsNullOrWhiteSpace(processPath) || !Path.IsPathFullyQualified(processPath))
-        {
-            return ErrorPlan(
-                "The widget executable path must be absolute.",
-                CodexHookConfigurationErrorKind.InvalidProcessPath);
-        }
-
-        return PlanChange(processPath, install: false);
-    }
+    public CodexHookConfigurationPlan PlanUninstall() => PlanChange(install: false);
 
     public void Apply(CodexHookConfigurationPlan plan)
     {
@@ -106,13 +82,10 @@ public sealed partial class CodexHookConfigurationManager
         }
     }
 
-    public static string BuildHookCommand(string processPath)
-    {
-        var escapedProcessPath = processPath.Replace("'", "''", StringComparison.Ordinal);
-        return $"& '{escapedProcessPath}' --codex-activity-hook";
-    }
+    public static string BuildLegacyHookCommand(string processPath) =>
+        CodexActivityHookDefinition.BuildLegacyCommand(processPath);
 
-    private CodexHookConfigurationPlan PlanChange(string processPath, bool install)
+    private CodexHookConfigurationPlan PlanChange(bool install)
     {
         var originalExisted = File.Exists(_hooksPath);
         string? originalContent = null;
@@ -160,7 +133,6 @@ public sealed partial class CodexHookConfigurationManager
         }
 
         var changed = false;
-        var command = BuildHookCommand(processPath);
         foreach (var eventName in ActivityEvents)
         {
             if (hooks[eventName] is not null && hooks[eventName] is not JsonArray)
@@ -178,13 +150,14 @@ public sealed partial class CodexHookConfigurationManager
                 groups ??= new JsonArray();
                 hooks[eventName] = groups;
                 var recognizedCount = CountRecognizedHandlers(groups);
-                var currentCount = CountExactHandlers(groups, command);
+                var currentCount = CountExactHandlers(groups);
                 if (recognizedCount != 1 || currentCount != 1)
                 {
                     RemoveRecognizedHandlers(groups);
                     groups.Add(new JsonObject
                     {
-                        ["hooks"] = new JsonArray(CreateHandler(command))
+                        ["hooks"] = new JsonArray(
+                            CodexActivityHookDefinition.CreateCurrentHandler())
                     });
                     changed = true;
                 }
@@ -243,9 +216,9 @@ public sealed partial class CodexHookConfigurationManager
         }
     }
 
-    private static int CountExactHandlers(JsonArray groups, string command)
+    private static int CountExactHandlers(JsonArray groups)
     {
-        var expected = CreateHandler(command);
+        var expected = CodexActivityHookDefinition.CreateCurrentHandler();
         return groups
             .OfType<JsonObject>()
             .Select(group => group["hooks"])
@@ -260,7 +233,7 @@ public sealed partial class CodexHookConfigurationManager
             .Select(group => group["hooks"])
             .OfType<JsonArray>()
             .SelectMany(handlers => handlers)
-            .Count(IsRecognizedWidgetHandler);
+            .Count(CodexActivityHookDefinition.IsRecognized);
 
     private static bool RemoveRecognizedHandlers(JsonArray groups)
     {
@@ -276,7 +249,7 @@ public sealed partial class CodexHookConfigurationManager
             var removedFromGroup = false;
             for (var index = handlers.Count - 1; index >= 0; index--)
             {
-                if (IsRecognizedWidgetHandler(handlers[index]))
+                if (CodexActivityHookDefinition.IsRecognized(handlers[index]))
                 {
                     handlers.RemoveAt(index);
                     changed = true;
@@ -292,112 +265,6 @@ public sealed partial class CodexHookConfigurationManager
 
         return changed;
     }
-
-    private static bool IsRecognizedWidgetHandler(JsonNode? handler)
-    {
-        if (handler is not JsonObject handlerObject ||
-            handlerObject["command"] is not JsonValue commandValue ||
-            !commandValue.TryGetValue<string>(out var command) ||
-            !TryGetGeneratedWidgetCommandTimeout(command, out var timeoutSeconds))
-        {
-            return false;
-        }
-
-        return JsonNode.DeepEquals(handler, CreateHandler(command, timeoutSeconds));
-    }
-
-    private static bool TryGetGeneratedWidgetCommandTimeout(
-        string command,
-        out int timeoutSeconds)
-    {
-        if (TryReadSingleQuotedPath(
-                command,
-                "& '",
-                $"' {HookArgument}",
-                out var processPath) ||
-            TryReadSingleQuotedPath(
-                command,
-                NestedPowerShellPrefix,
-                $"' {HookArgument}\"",
-                out processPath))
-        {
-            timeoutSeconds = HookTimeoutSeconds;
-            return IsWidgetExecutablePath(processPath);
-        }
-
-        const string LegacyPrefix = "\"";
-        var legacySuffix = $"\" {HookArgument}";
-        if (command.StartsWith(LegacyPrefix, StringComparison.Ordinal) &&
-            command.EndsWith(legacySuffix, StringComparison.Ordinal) &&
-            command.Length > LegacyPrefix.Length + legacySuffix.Length)
-        {
-            var pathLength = command.Length - LegacyPrefix.Length - legacySuffix.Length;
-            processPath = command.Substring(LegacyPrefix.Length, pathLength);
-            if (!processPath.Contains('"', StringComparison.Ordinal))
-            {
-                timeoutSeconds = LegacyHookTimeoutSeconds;
-                return IsWidgetExecutablePath(processPath);
-            }
-        }
-
-        timeoutSeconds = 0;
-        return false;
-    }
-
-    private static bool TryReadSingleQuotedPath(
-        string command,
-        string prefix,
-        string suffix,
-        out string processPath)
-    {
-        processPath = string.Empty;
-        if (!command.StartsWith(prefix, StringComparison.Ordinal) ||
-            !command.EndsWith(suffix, StringComparison.Ordinal) ||
-            command.Length <= prefix.Length + suffix.Length)
-        {
-            return false;
-        }
-
-        var escapedPath = command.AsSpan(
-            prefix.Length,
-            command.Length - prefix.Length - suffix.Length);
-        var path = new StringBuilder(escapedPath.Length);
-        for (var index = 0; index < escapedPath.Length; index++)
-        {
-            if (escapedPath[index] != '\'')
-            {
-                path.Append(escapedPath[index]);
-                continue;
-            }
-
-            if (index + 1 >= escapedPath.Length || escapedPath[index + 1] != '\'')
-            {
-                return false;
-            }
-
-            path.Append('\'');
-            index++;
-        }
-
-        processPath = path.ToString();
-        return true;
-    }
-
-    private static bool IsWidgetExecutablePath(string processPath) =>
-        Path.IsPathFullyQualified(processPath) &&
-        string.Equals(
-            Path.GetFileName(processPath),
-            WidgetExecutableName,
-            StringComparison.OrdinalIgnoreCase);
-
-    private static JsonObject CreateHandler(
-        string command,
-        int timeoutSeconds = HookTimeoutSeconds) => new()
-    {
-        ["type"] = "command",
-        ["command"] = command,
-        ["timeout"] = timeoutSeconds
-    };
 
     private static CodexHookConfigurationPlan NoChangePlan(
         bool originalExisted,
@@ -437,7 +304,6 @@ public enum CodexHookConfigurationErrorKind
 {
     None,
     HooksDisabled,
-    InvalidProcessPath,
     InvalidConfiguration
 }
 
