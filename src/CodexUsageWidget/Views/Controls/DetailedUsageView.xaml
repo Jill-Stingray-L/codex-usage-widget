@@ -92,17 +92,47 @@
 
                     <ItemsControl Height="48"
                                   Margin="0,0,0,9"
+                                  HorizontalAlignment="Center"
                                   VerticalAlignment="Bottom"
                                   ItemsSource="{Binding TokenActivity.DailyBars}">
                         <ItemsControl.ItemsPanel>
                             <ItemsPanelTemplate>
-                                <UniformGrid Rows="1" />
+                                <StackPanel Orientation="Horizontal" />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Grid Margin="1,0" ToolTip="{Binding ToolTip}">
-                                    <Border Height="{Binding Height}"
+                                <Grid Width="10"
+                                      Height="48"
+                                      ToolTipService.InitialShowDelay="150"
+                                      ToolTipService.BetweenShowDelay="0"
+                                      ToolTipService.ShowDuration="15000"
+                                      ToolTipService.Placement="MousePoint"
+                                      ToolTipService.HorizontalOffset="10"
+                                      ToolTipService.VerticalOffset="10">
+                                    <Grid.ToolTip>
+                                        <ToolTip DataContext="{Binding PlacementTarget.DataContext,
+                                                                       RelativeSource={RelativeSource Self}}"
+                                                 Style="{StaticResource TokenActivityToolTip}">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding DateText}"
+                                                           FontSize="10.5"
+                                                           Foreground="{StaticResource TextSecondary}" />
+                                                <TextBlock Margin="0,3,0,0"
+                                                           Text="{Binding TokensText}"
+                                                           FontSize="13"
+                                                           FontWeight="SemiBold"
+                                                           Foreground="{StaticResource AccentDataBrush}" />
+                                                <TextBlock Margin="0,2,0,0"
+                                                           Text="{Binding PeakComparisonText}"
+                                                           FontSize="10"
+                                                           Foreground="{StaticResource TextTertiary}" />
+                                            </StackPanel>
+                                        </ToolTip>
+                                    </Grid.ToolTip>
+                                    <Border Width="8"
+                                            Height="{Binding Height}"
+                                            HorizontalAlignment="Center"
                                             VerticalAlignment="Bottom"
                                             Background="{StaticResource AccentDataBrush}"
                                             CornerRadius="2,2,0,0" />

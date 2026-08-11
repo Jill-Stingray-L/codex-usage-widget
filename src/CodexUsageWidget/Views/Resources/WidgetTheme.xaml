@@ -16,6 +16,31 @@
     <SolidColorBrush x:Key="AccentDataBrush" Color="{StaticResource AccentDataColor}" />
     <CubicEase x:Key="DialogButtonEaseOut" EasingMode="EaseOut" />
 
+    <Style x:Key="TokenActivityToolTip" TargetType="ToolTip">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="HasDropShadow" Value="False" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToolTip">
+                    <Border Padding="10,8"
+                            Background="#F5232323"
+                            BorderBrush="#4A4A4A"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            SnapsToDevicePixels="True">
+                        <Border.Effect>
+                            <DropShadowEffect BlurRadius="12"
+                                              ShadowDepth="2"
+                                              Opacity="0.42"
+                                              Color="#000000" />
+                        </Border.Effect>
+                        <ContentPresenter />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="DialogWindow" TargetType="Window">
         <Setter Property="WindowStyle" Value="None" />
         <Setter Property="AllowsTransparency" Value="True" />

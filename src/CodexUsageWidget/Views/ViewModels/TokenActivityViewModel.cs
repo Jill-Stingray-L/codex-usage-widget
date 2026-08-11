@@ -58,7 +58,9 @@ public sealed class TokenActivityViewModel
         return recent
             .Select(item => new DailyUsageBarViewModel(
                 Math.Max(3d, 44d * item.Tokens / maximum),
-                $"{item.Date:ddd, MMM d} · {item.Tokens:N0} tokens"))
+                item.Date.ToString("dddd, MMMM d", CultureInfo.CurrentCulture),
+                $"{item.Tokens.ToString("N0", CultureInfo.CurrentCulture)} tokens",
+                $"{100d * item.Tokens / maximum:0}% of chart peak"))
             .ToArray();
     }
 
