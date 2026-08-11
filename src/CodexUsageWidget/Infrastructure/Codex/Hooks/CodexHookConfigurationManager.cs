@@ -133,6 +133,7 @@ public sealed partial class CodexHookConfigurationManager
         }
 
         var changed = false;
+        var hasRecognizedHandlers = false;
         foreach (var eventName in ActivityEvents)
         {
             if (hooks[eventName] is not null && hooks[eventName] is not JsonArray)
@@ -145,11 +146,12 @@ public sealed partial class CodexHookConfigurationManager
             }
 
             var groups = hooks[eventName] as JsonArray;
+            var recognizedCount = groups is null ? 0 : CountRecognizedHandlers(groups);
+            hasRecognizedHandlers |= recognizedCount > 0;
             if (install)
             {
                 groups ??= new JsonArray();
                 hooks[eventName] = groups;
-                var recognizedCount = CountRecognizedHandlers(groups);
                 var currentCount = CountExactHandlers(groups);
                 if (recognizedCount != 1 || currentCount != 1)
                 {
@@ -170,7 +172,10 @@ public sealed partial class CodexHookConfigurationManager
 
         if (!changed)
         {
-            return NoChangePlan(originalExisted, originalContent);
+            return NoChangePlan(
+                originalExisted,
+                originalContent,
+                hasRecognizedHandlers);
         }
 
         var proposedContent = root.ToJsonString(IndentedJson) + Environment.NewLine;
@@ -180,7 +185,8 @@ public sealed partial class CodexHookConfigurationManager
             error: null,
             originalExisted,
             originalContent,
-            CodexHookConfigurationErrorKind.None);
+            CodexHookConfigurationErrorKind.None,
+            hasRecognizedHandlers);
     }
 
     private string? GetDisabledFeatureError()
@@ -268,14 +274,16 @@ public sealed partial class CodexHookConfigurationManager
 
     private static CodexHookConfigurationPlan NoChangePlan(
         bool originalExisted,
-        string? originalContent) =>
+        string? originalContent,
+        bool hasRecognizedHandlers = false) =>
         new(
             hasChanges: false,
             proposedContent: originalContent ?? string.Empty,
             error: null,
             originalExisted,
             originalContent,
-            CodexHookConfigurationErrorKind.None);
+            CodexHookConfigurationErrorKind.None,
+            hasRecognizedHandlers);
 
     private static CodexHookConfigurationPlan ErrorPlan(
         string error,
@@ -288,7 +296,8 @@ public sealed partial class CodexHookConfigurationManager
             error,
             originalExisted,
             originalContent,
-            errorKind);
+            errorKind,
+            hasRecognizedHandlers: false);
 
     [GeneratedRegex(@"^\s*\[[^\]]+\]\s*(?:#.*)?$")]
     private static partial Regex TomlSectionRegex();
@@ -315,7 +324,8 @@ public sealed class CodexHookConfigurationPlan
         string? error,
         bool originalExisted,
         string? originalContent,
-        CodexHookConfigurationErrorKind errorKind)
+        CodexHookConfigurationErrorKind errorKind,
+        bool hasRecognizedHandlers)
     {
         HasChanges = hasChanges;
         ProposedContent = proposedContent;
@@ -323,6 +333,7 @@ public sealed class CodexHookConfigurationPlan
         OriginalExisted = originalExisted;
         OriginalContent = originalContent;
         ErrorKind = errorKind;
+        HasRecognizedHandlers = hasRecognizedHandlers;
     }
 
     public bool HasChanges { get; }
@@ -332,6 +343,8 @@ public sealed class CodexHookConfigurationPlan
     public string? Error { get; }
 
     public CodexHookConfigurationErrorKind ErrorKind { get; }
+
+    public bool HasRecognizedHandlers { get; }
 
     internal bool OriginalExisted { get; }
 

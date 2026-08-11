@@ -45,7 +45,10 @@ public sealed class CodexActivityHookSetupService : IActivityHookSetupService
 
         if (configurationPlan.HasChanges)
         {
-            return new ActivityHookSetupStatus(ActivityHookSetupState.NotInstalled);
+            return new ActivityHookSetupStatus(
+                configurationPlan.HasRecognizedHandlers
+                    ? ActivityHookSetupState.UpdateRequired
+                    : ActivityHookSetupState.NotInstalled);
         }
 
         try

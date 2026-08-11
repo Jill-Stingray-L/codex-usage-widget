@@ -179,7 +179,10 @@ public sealed class CodexHookConfigurationManagerTests : IDisposable
             """);
 
         var manager = CreateManager();
-        manager.Apply(manager.PlanInstall());
+        var plan = manager.PlanInstall();
+
+        Assert.True(plan.HasRecognizedHandlers);
+        manager.Apply(plan);
 
         var content = File.ReadAllText(HooksPath);
         Assert.DoesNotContain(legacyCommand, content, StringComparison.Ordinal);

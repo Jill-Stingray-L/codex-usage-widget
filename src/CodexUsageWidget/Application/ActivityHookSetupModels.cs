@@ -3,6 +3,7 @@ namespace CodexUsageWidget.Application;
 public enum ActivityHookSetupState
 {
     NotInstalled,
+    UpdateRequired,
     ApprovalRequired,
     Active,
     Modified,

@@ -27,6 +27,8 @@ public sealed class ActivityHookSetupViewModel
 
     public string CodexActionLabel { get; private init; } = "Open in Codex";
 
+    public string InstallActionLabel { get; private init; } = "Review hooks";
+
     public static ActivityHookSetupViewModel Loading() => new();
 
     public static ActivityHookSetupViewModel FromStatus(ActivityHookSetupStatus status) =>
@@ -40,6 +42,18 @@ public sealed class ActivityHookSetupViewModel
                     "You can review the exact hooks.json change before it is written.",
                 StatusBrush = BrushFromHex("#D6A15F"),
                 CanInstall = true,
+                CanRefresh = true
+            },
+            ActivityHookSetupState.UpdateRequired => new ActivityHookSetupViewModel
+            {
+                StatusLabel = "Update available",
+                Description =
+                    "Activity handlers from an older widget version are installed. " +
+                    "Update them to the faster, path-independent bridge after reviewing the exact change.",
+                StatusBrush = BrushFromHex("#D6A15F"),
+                InstallActionLabel = "Review update",
+                CanInstall = true,
+                CanUninstall = true,
                 CanRefresh = true
             },
             ActivityHookSetupState.ApprovalRequired => new ActivityHookSetupViewModel

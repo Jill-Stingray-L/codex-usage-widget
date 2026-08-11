@@ -29,6 +29,34 @@ public sealed class CodexActivityHookSetupServiceTests : IDisposable
         Assert.Equal(0, session.RequestCount);
     }
 
+    [Fact]
+    public async Task LegacyHandlersAreReportedAsRequiringAnUpdate()
+    {
+        Directory.CreateDirectory(_directory);
+        var legacyCommand =
+            $"\"{Path.Combine(_directory, "CodexUsageWidget.exe")}\" --codex-activity-hook";
+        File.WriteAllText(HooksPath, $$"""
+            {
+              "hooks": {
+                "UserPromptSubmit": [{ "hooks": [{ "type": "command", "command": {{JsonSerializer.Serialize(legacyCommand)}}, "timeout": 1 }] }],
+                "Stop": [{ "hooks": [{ "type": "command", "command": {{JsonSerializer.Serialize(legacyCommand)}}, "timeout": 1 }] }],
+                "SessionEnd": [{ "hooks": [{ "type": "command", "command": {{JsonSerializer.Serialize(legacyCommand)}}, "timeout": 1 }] }]
+              }
+            }
+            """);
+        var session = new FakeAppServerSession();
+
+        var status = await CreateService(session).GetStatusAsync();
+        var viewModel = ActivityHookSetupViewModel.FromStatus(status);
+
+        Assert.Equal(ActivityHookSetupState.UpdateRequired, status.State);
+        Assert.Equal("Update available", viewModel.StatusLabel);
+        Assert.Equal("Review update", viewModel.InstallActionLabel);
+        Assert.True(viewModel.CanInstall);
+        Assert.True(viewModel.CanUninstall);
+        Assert.Equal(0, session.RequestCount);
+    }
+
     [Theory]
     [InlineData("trusted", "trusted", "trusted", ActivityHookSetupState.Active)]
     [InlineData("managed", "trusted", "trusted", ActivityHookSetupState.Active)]
