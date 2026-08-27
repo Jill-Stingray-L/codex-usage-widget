@@ -23,6 +23,7 @@ public partial class MainWindow : Window
     private readonly ActivityHookSetupWindowController _activityHookSetupWindows;
     private readonly DisplayModeStore _displayModeStore;
     private readonly WidgetDensityStore _densityStore;
+    private readonly DisplayedLimitPreferenceStore _displayedLimitPreferenceStore;
     private readonly StartupRegistrationService _startupRegistration;
     private readonly TrayIconService _trayIcon;
     private readonly TaskbarLabelWindow _taskbarLabel = new();
@@ -30,6 +31,8 @@ public partial class MainWindow : Window
     private readonly MainWindowCloseState _closeState = new();
     private WidgetDisplayMode _displayMode;
     private WidgetDensity _density;
+    private DisplayedLimitPreference _displayedLimitPreference;
+    private UsageSnapshot? _latestSnapshot;
     private UsageWidgetViewModel _viewModel = UsageWidgetViewModel.Loading();
     private bool _isRealActivityActive;
     private bool _isActivityPreviewEnabled;
@@ -42,6 +45,7 @@ public partial class MainWindow : Window
         ICodexLauncher codexLauncher,
         DisplayModeStore displayModeStore,
         WidgetDensityStore densityStore,
+        DisplayedLimitPreferenceStore displayedLimitPreferenceStore,
         StartupRegistrationService startupRegistration,
         TrayIconService trayIcon)
     {
@@ -53,10 +57,12 @@ public partial class MainWindow : Window
             codexLauncher);
         _displayModeStore = displayModeStore;
         _densityStore = densityStore;
+        _displayedLimitPreferenceStore = displayedLimitPreferenceStore;
         _startupRegistration = startupRegistration;
         _trayIcon = trayIcon;
         _displayMode = displayModeStore.Load();
         _density = densityStore.Load();
+        _displayedLimitPreference = displayedLimitPreferenceStore.Load();
         _widgetVisibility = new WidgetVisibilityController(() => IsVisible, ShowWidget, Hide);
 
         InitializeComponent();
@@ -98,10 +104,14 @@ public partial class MainWindow : Window
                 _isActivityPreviewEnabled = _taskbarLabel.IsActivityPreviewEnabled;
                 ApplyActivityIndicatorState();
             });
+        _taskbarLabel.DisplayedLimitPreferenceChanged += preference =>
+            Dispatcher.BeginInvoke(() => SetDisplayedLimitPreference(preference));
         _taskbarLabel.DesktopModeRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget));
         _taskbarLabel.StartupToggleRequested += (_, _) =>
             Dispatcher.BeginInvoke(ToggleStartupRegistration);
+        _taskbarLabel.UpdateCheckRequested += (_, _) =>
+            Dispatcher.BeginInvoke(CheckForUpdates);
         _taskbarLabel.ExitRequested += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
 
         _trayIcon.OpenRequested += (_, _) => Dispatcher.BeginInvoke(_widgetVisibility.Show);
@@ -113,8 +123,12 @@ public partial class MainWindow : Window
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget));
         _trayIcon.TaskbarModeRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.TaskbarIndicator));
+        _trayIcon.DisplayedLimitPreferenceChanged += preference =>
+            Dispatcher.BeginInvoke(() => SetDisplayedLimitPreference(preference));
         _trayIcon.StartupToggleRequested += (_, _) =>
             Dispatcher.BeginInvoke(ToggleStartupRegistration);
+        _trayIcon.UpdateCheckRequested += (_, _) =>
+            Dispatcher.BeginInvoke(CheckForUpdates);
         _trayIcon.ExitRequested += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
     }
 
@@ -122,6 +136,7 @@ public partial class MainWindow : Window
     {
         PositionNearWorkAreaEdge();
         _trayIcon.SetDisplayMode(_displayMode);
+        SetDisplayedLimitPreferenceState(_displayedLimitPreference);
         SetStartupRegistrationState(_startupRegistration.IsEnabled);
         if (_displayMode == WidgetDisplayMode.TaskbarIndicator)
         {
@@ -156,7 +171,9 @@ public partial class MainWindow : Window
 
     private void RenderSnapshot(UsageSnapshot snapshot)
     {
-        var nextViewModel = UsageWidgetViewModel.FromSnapshot(snapshot);
+        _latestSnapshot = snapshot;
+        var displayedWindow = ResolveDisplayedWindow(snapshot);
+        var nextViewModel = UsageWidgetViewModel.FromSnapshot(snapshot, displayedWindow);
         SetViewModel(nextViewModel);
         if (_density == WidgetDensity.Detailed)
         {
@@ -167,17 +184,58 @@ public partial class MainWindow : Window
             ApplyDensity(repositionBottomEdge: true);
         }
 
-        _trayIcon.UpdateUsage(nextViewModel.HeadlineRemainingPercent);
+        _trayIcon.UpdateUsage(displayedWindow?.RemainingPercent);
         _taskbarLabel.UpdateUsage(
-            nextViewModel.HeadlineRemainingPercent,
-            nextViewModel.HeadlineResetsAt);
+            displayedWindow?.Label,
+            displayedWindow?.RemainingPercent,
+            displayedWindow?.ResetsAt);
     }
 
     private void RenderError(string message)
     {
+        _latestSnapshot = null;
         SetViewModel(UsageWidgetViewModel.Error(message));
         _trayIcon.UpdateUsage(null);
-        _taskbarLabel.UpdateUsage(null, null);
+        _taskbarLabel.UpdateUsage(null, null, null);
+    }
+
+    private void SetDisplayedLimitPreference(DisplayedLimitPreference preference)
+    {
+        _displayedLimitPreference = preference;
+        _displayedLimitPreferenceStore.Save(preference);
+        SetDisplayedLimitPreferenceState(preference);
+
+        if (_latestSnapshot is { } snapshot)
+        {
+            RenderSnapshot(snapshot);
+        }
+    }
+
+    private void SetDisplayedLimitPreferenceState(DisplayedLimitPreference preference)
+    {
+        _taskbarLabel.SetDisplayedLimitPreference(preference);
+        _trayIcon.SetDisplayedLimitPreference(preference);
+    }
+
+    private UsageWindow? ResolveDisplayedWindow(UsageSnapshot snapshot)
+    {
+        var fiveHourAvailable = DisplayedUsageSelector.IsAvailable(
+            snapshot,
+            DisplayedLimitPreference.FiveHour);
+        _taskbarLabel.SetFiveHourLimitAvailability(fiveHourAvailable);
+        _trayIcon.SetFiveHourLimitAvailability(fiveHourAvailable);
+
+        var resolvedPreference = DisplayedUsageSelector.ResolvePreference(
+            snapshot,
+            _displayedLimitPreference);
+        if (resolvedPreference != _displayedLimitPreference)
+        {
+            _displayedLimitPreference = resolvedPreference;
+            _displayedLimitPreferenceStore.Save(resolvedPreference);
+            SetDisplayedLimitPreferenceState(resolvedPreference);
+        }
+
+        return DisplayedUsageSelector.Select(snapshot, _displayedLimitPreference);
     }
 
     private void SetViewModel(UsageWidgetViewModel viewModel)
@@ -306,6 +364,20 @@ public partial class MainWindow : Window
         _trayIcon.SetStartupEnabled(enabled);
     }
 
+    private static void CheckForUpdates()
+    {
+        if (GitHubReleaseLauncher.TryOpenLatestRelease())
+        {
+            return;
+        }
+
+        System.Windows.MessageBox.Show(
+            "Windows could not open the widget release page.",
+            "Codex Usage Widget",
+            MessageBoxButton.OK,
+            MessageBoxImage.Warning);
+    }
+
     private void Widget_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (e.ButtonState != MouseButtonState.Pressed ||
@@ -335,6 +407,9 @@ public partial class MainWindow : Window
         await _usageMonitor.RefreshAsync();
 
     private void DensityButton_OnClick(object sender, RoutedEventArgs e) => ToggleDensity();
+
+    private void SettingsButton_OnClick(object sender, RoutedEventArgs e) =>
+        _taskbarLabel.OpenMenu(SettingsButton);
 
     private void ActivityDotsButton_OnClick(object sender, RoutedEventArgs e) =>
         ShowActivityHookSetup();

@@ -20,6 +20,8 @@ public partial class ActivityHookSetupWindow : Window
     private readonly CancellationTokenSource _lifetime = new();
     private bool _refreshInProgress;
     private bool _refreshTrustOnActivation;
+    private bool _reviewDialogOpen;
+    private bool _closeRequested;
 
     public ActivityHookSetupWindow(
         IActivityHookSetupService setupService,
@@ -33,6 +35,8 @@ public partial class ActivityHookSetupWindow : Window
         DataContext = ActivityHookSetupViewModel.Loading();
         Loaded += ActivityHookSetupWindowOnLoaded;
         Activated += ActivityHookSetupWindowOnActivated;
+        Deactivated += ActivityHookSetupWindowOnDeactivated;
+        Closing += ActivityHookSetupWindowOnClosing;
         Closed += ActivityHookSetupWindowOnClosed;
     }
 
@@ -55,14 +59,28 @@ public partial class ActivityHookSetupWindow : Window
     {
         if (_refreshTrustOnActivation && !_refreshInProgress)
         {
+            _refreshTrustOnActivation = false;
             await RefreshStatusAsync();
         }
     }
+
+    private void ActivityHookSetupWindowOnDeactivated(object? sender, EventArgs e)
+    {
+        if (!_reviewDialogOpen && !_refreshTrustOnActivation)
+        {
+            RequestClose();
+        }
+    }
+
+    private void ActivityHookSetupWindowOnClosing(object? sender, CancelEventArgs e) =>
+        _closeRequested = true;
 
     private void ActivityHookSetupWindowOnClosed(object? sender, EventArgs e)
     {
         SizeChanged -= ActivityHookSetupWindowOnSizeChanged;
         Activated -= ActivityHookSetupWindowOnActivated;
+        Deactivated -= ActivityHookSetupWindowOnDeactivated;
+        Closing -= ActivityHookSetupWindowOnClosing;
         _lifetime.Cancel();
         _lifetime.Dispose();
     }
@@ -90,7 +108,10 @@ public partial class ActivityHookSetupWindow : Window
                 _refreshTrustOnActivation = false;
             }
         }
-        catch (OperationCanceledException) when (!_lifetime.IsCancellationRequested)
+        catch (OperationCanceledException) when (_lifetime.IsCancellationRequested)
+        {
+        }
+        catch (OperationCanceledException)
         {
             DataContext = ActivityHookSetupViewModel.Error(
                 "Codex did not report hook status in time. Check that the CLI is available, then try again.");
@@ -116,7 +137,18 @@ public partial class ActivityHookSetupWindow : Window
         }
     }
 
-    private void CloseButton_OnClick(object sender, RoutedEventArgs e) => Close();
+    private void CloseButton_OnClick(object sender, RoutedEventArgs e) => RequestClose();
+
+    private void RequestClose()
+    {
+        if (_closeRequested)
+        {
+            return;
+        }
+
+        _closeRequested = true;
+        Close();
+    }
 
     private async void InstallButton_OnClick(object sender, RoutedEventArgs e) =>
         await ReviewAndApplyAsync(ActivityHookChangeKind.Install);
@@ -136,7 +168,18 @@ public partial class ActivityHookSetupWindow : Window
             }
 
             var reviewWindow = new ActivityHookChangeReviewWindow(preview) { Owner = this };
-            if (reviewWindow.ShowDialog() != true)
+            bool accepted;
+            _reviewDialogOpen = true;
+            try
+            {
+                accepted = reviewWindow.ShowDialog() == true;
+            }
+            finally
+            {
+                _reviewDialogOpen = false;
+            }
+
+            if (!accepted)
             {
                 return;
             }

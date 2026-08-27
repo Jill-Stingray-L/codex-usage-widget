@@ -25,6 +25,8 @@
             CornerRadius="6"
             Cursor="Hand"
             Padding="8,0,0,0"
+            ContextMenuService.Placement="Top"
+            ContextMenuService.VerticalOffset="-2"
             ToolTipService.Placement="Top"
             ToolTipService.VerticalOffset="-8"
             MouseLeftButtonUp="LabelSurface_OnMouseLeftButtonUp">
@@ -39,11 +41,15 @@
             </Style>
         </Border.Style>
         <Border.ContextMenu>
-            <ContextMenu Style="{StaticResource TaskbarContextMenu}">
+            <ContextMenu x:Name="TaskbarMenu"
+                         Style="{StaticResource TaskbarContextMenu}"
+                         Opened="TaskbarMenu_OnOpened"
+                         Closed="TaskbarMenu_OnClosed">
                 <ContextMenu.Resources>
                     <Style TargetType="MenuItem"
                            BasedOn="{StaticResource TaskbarContextMenuItem}" />
-                    <Style TargetType="Separator"
+                    <Style x:Key="{x:Static MenuItem.SeparatorStyleKey}"
+                           TargetType="Separator"
                            BasedOn="{StaticResource TaskbarContextMenuSeparator}" />
                 </ContextMenu.Resources>
                 <MenuItem Header="Open widget" Click="OpenMenuItem_OnClick">
@@ -75,6 +81,42 @@
                               Style="{StaticResource TaskbarMenuIcon}" />
                     </MenuItem.Icon>
                 </MenuItem>
+                <MenuItem Header="Displayed limit">
+                    <MenuItem.Icon>
+                        <Path Data="M 2.5,12.5 A 6,6 0 1 1 13.5,12.5 M 8,8 L 11.5,5"
+                              Style="{StaticResource TaskbarMenuIcon}" />
+                    </MenuItem.Icon>
+                    <MenuItem x:Name="FiveHourLimitMenuItem"
+                              Header="5h limit"
+                              IsEnabled="False"
+                              IsCheckable="True"
+                              ToolTipService.BetweenShowDelay="0"
+                              ToolTipService.HorizontalOffset="10"
+                              ToolTipService.InitialShowDelay="150"
+                              ToolTipService.Placement="MousePoint"
+                              ToolTipService.ShowDuration="15000"
+                              ToolTipService.ShowOnDisabled="True"
+                              ToolTipService.VerticalOffset="10"
+                              Click="FiveHourLimitMenuItem_OnClick">
+                        <MenuItem.ToolTip>
+                            <ToolTip Style="{StaticResource TokenActivityToolTip}">
+                                <TextBlock MaxWidth="240"
+                                           Text="Codex did not return a global 5h limit for this account."
+                                           TextWrapping="Wrap"
+                                           FontSize="11.5"
+                                           Foreground="{StaticResource TextSecondary}" />
+                            </ToolTip>
+                        </MenuItem.ToolTip>
+                    </MenuItem>
+                    <MenuItem x:Name="WeeklyLimitMenuItem"
+                              Header="Weekly limit"
+                              IsCheckable="True"
+                              Click="WeeklyLimitMenuItem_OnClick" />
+                    <MenuItem x:Name="MostConstrainedLimitMenuItem"
+                              Header="Most constrained"
+                              IsCheckable="True"
+                              Click="MostConstrainedLimitMenuItem_OnClick" />
+                </MenuItem>
                 <Separator />
                 <MenuItem Header="Use desktop widget" Click="DesktopModeMenuItem_OnClick">
                     <MenuItem.Icon>
@@ -88,6 +130,12 @@
                           Click="StartWithWindowsMenuItem_OnClick">
                     <MenuItem.Icon>
                         <Path Data="M 8,2 V 8 M 4.5,4.5 A 5,5 0 1 0 11.5,4.5"
+                              Style="{StaticResource TaskbarMenuIcon}" />
+                    </MenuItem.Icon>
+                </MenuItem>
+                <MenuItem Header="Check for updates..." Click="CheckForUpdatesMenuItem_OnClick">
+                    <MenuItem.Icon>
+                        <Path Data="M 6,3 H 13 V 10 M 13,3 L 5,11 M 10,13 H 3 V 6"
                               Style="{StaticResource TaskbarMenuIcon}" />
                     </MenuItem.Icon>
                 </MenuItem>
