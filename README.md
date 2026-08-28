@@ -35,8 +35,10 @@ of `codex.cmd` or `codex.exe`.
 
 - Remaining percentage and reset time for every general Codex usage window
 - A selectable displayed limit shared by the widget headline, taskbar label, and tray icon
-- Compact and detailed layouts, including credits, spend controls, earned resets, token
-  activity, and model-specific limits when Codex returns them
+- Compact and detailed desktop-widget layouts selected from Settings or the quick chevron,
+  including credits, spend controls, earned resets, token activity, and model-specific limits
+  when Codex returns them
+- System, light, and dark themes with five preset accent colors selected from Settings
 - A movable, always-on-top desktop widget and a compact label beside the notification area
 - Live task activity dots based on official local Codex lifecycle hooks
 - Automatic refresh every two minutes plus live rate-limit notifications
@@ -51,7 +53,7 @@ visible below it. Compact mode focuses on limits; Details adds account and token
 **Taskbar label.** Shows the same selected percentage beside the Windows notification area.
 The tray icon and its tooltip follow that selection too.
 
-Choose `5h limit`, `Weekly limit`, or `Most constrained` from the **Displayed limit** menu.
+Choose `5h limit`, `Weekly limit`, or `Most constrained` in **Settings** under **Usage**.
 The 5-hour window is the default. Available windows depend on the Codex account, so the
 widget falls back to an available window when Codex does not return the selected one.
 
@@ -63,8 +65,10 @@ subscription percentage.
 ![Codex Usage Widget taskbar label preview](docs/images/taskbar-label.png)
 
 Select the `−` button to move the widget to the taskbar. Right-click the taskbar label or
-tray icon to refresh, change the display mode or displayed limit, configure activity dots,
-toggle start with Windows, check for updates, or exit.
+tray icon to refresh, change the display mode, open Settings, check for updates, or exit.
+The Settings window opens from the gear button on the widget too. Theme, accent color,
+widget layout, displayed limit, and Start with Windows changes apply as soon as they are
+selected.
 
 ## Activity dots
 
@@ -74,7 +78,7 @@ read prompt text, responses, transcript paths, or model output.
 
 To enable them:
 
-1. Open **Activity dots...** from the widget, taskbar label, or tray menu.
+1. Open **Settings**, then find **Codex activity** under **Features**.
 2. Select **Install hooks** and review the exact proposed `~/.codex/hooks.json` change.
 3. Select **Copy /hooks and open Codex**, paste `/hooks`, and trust the three definitions.
 4. Return to the widget and select **Check again**.
@@ -95,6 +99,8 @@ The application writes only under `%LOCALAPPDATA%\CodexUsageWidget`:
 - `display-mode.txt`: desktop or taskbar display preference
 - `widget-density.txt`: compact or detailed widget preference
 - `displayed-limit.txt`: selected summary limit
+- `theme.txt`: system, light, or dark theme preference
+- `accent-palette.txt`: selected preset accent color
 - `logs\codex-usage-widget-YYYYMMDD.log`: diagnostic logs retained for 14 days
 
 The widget displays ChatGPT and Codex subscription limits. It does not display OpenAI API
@@ -102,8 +108,9 @@ billing or API-key usage.
 
 ## Uninstall
 
-1. If activity hooks are installed, open **Activity dots...** and select **Remove hooks**.
-2. Turn off **Start with Windows** from the widget or tray menu.
+1. If activity hooks are installed, open **Settings**, find **Codex activity** under
+   **Features**, and select **Remove hooks**.
+2. Turn off **Start with Windows** in **Settings** under **General**.
 3. Exit the widget.
 4. Delete the extracted application folder and `%LOCALAPPDATA%\CodexUsageWidget`. The local
    data folder contains any stable copy, saved preferences, and diagnostic logs.

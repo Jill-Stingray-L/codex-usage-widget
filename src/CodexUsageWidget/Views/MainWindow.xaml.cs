@@ -20,15 +20,18 @@ public partial class MainWindow : Window
 
     private readonly UsageMonitor _usageMonitor;
     private readonly CodexActivityMonitor _activityMonitor;
-    private readonly ActivityHookSetupWindowController _activityHookSetupWindows;
+    private readonly IActivityHookSetupService _activityHookSetupService;
+    private readonly ICodexLauncher _codexLauncher;
     private readonly DisplayModeStore _displayModeStore;
     private readonly WidgetDensityStore _densityStore;
     private readonly DisplayedLimitPreferenceStore _displayedLimitPreferenceStore;
     private readonly StartupRegistrationService _startupRegistration;
     private readonly TrayIconService _trayIcon;
+    private readonly AppThemeController _themeController;
     private readonly TaskbarLabelWindow _taskbarLabel = new();
     private readonly WidgetVisibilityController _widgetVisibility;
     private readonly MainWindowCloseState _closeState = new();
+    private SettingsWindow? _settingsWindow;
     private WidgetDisplayMode _displayMode;
     private WidgetDensity _density;
     private DisplayedLimitPreference _displayedLimitPreference;
@@ -36,6 +39,7 @@ public partial class MainWindow : Window
     private UsageWidgetViewModel _viewModel = UsageWidgetViewModel.Loading();
     private bool _isRealActivityActive;
     private bool _isActivityPreviewEnabled;
+    private bool _isSettingsOpen;
     private bool _shutdownStarted;
 
     public MainWindow(
@@ -47,19 +51,19 @@ public partial class MainWindow : Window
         WidgetDensityStore densityStore,
         DisplayedLimitPreferenceStore displayedLimitPreferenceStore,
         StartupRegistrationService startupRegistration,
-        TrayIconService trayIcon)
+        TrayIconService trayIcon,
+        AppThemeController themeController)
     {
         _usageMonitor = usageMonitor;
         _activityMonitor = activityMonitor;
-        _activityHookSetupWindows = new ActivityHookSetupWindowController(
-            this,
-            activityHookSetupService,
-            codexLauncher);
+        _activityHookSetupService = activityHookSetupService;
+        _codexLauncher = codexLauncher;
         _displayModeStore = displayModeStore;
         _densityStore = densityStore;
         _displayedLimitPreferenceStore = displayedLimitPreferenceStore;
         _startupRegistration = startupRegistration;
         _trayIcon = trayIcon;
+        _themeController = themeController;
         _displayMode = displayModeStore.Load();
         _density = densityStore.Load();
         _displayedLimitPreference = displayedLimitPreferenceStore.Load();
@@ -83,33 +87,20 @@ public partial class MainWindow : Window
         _usageMonitor.SnapshotUpdated += UsageMonitorOnSnapshotUpdated;
         _usageMonitor.RefreshFailed += UsageMonitorOnRefreshFailed;
         _activityMonitor.ActivityChanged += ActivityMonitorOnActivityChanged;
-        _activityHookSetupWindows.Closed += (_, _) =>
-        {
-            if (_displayMode == WidgetDisplayMode.TaskbarIndicator)
-            {
-                Hide();
-            }
-        };
-
         _taskbarLabel.OpenRequested += (_, _) =>
             Dispatcher.BeginInvoke(_widgetVisibility.Show, DispatcherPriority.ApplicationIdle);
         _taskbarLabel.ToggleRequested += (_, _) => _widgetVisibility.Toggle();
         _taskbarLabel.RefreshRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => _ = _usageMonitor.RefreshAsync());
-        _taskbarLabel.ActivityDotsSetupRequested += (_, _) =>
-            Dispatcher.BeginInvoke(ShowActivityHookSetup);
+        _taskbarLabel.SettingsRequested += (_, _) => Dispatcher.BeginInvoke(ShowSettings);
         _taskbarLabel.ActivityPreviewChanged += (_, _) =>
             Dispatcher.BeginInvoke(() =>
             {
                 _isActivityPreviewEnabled = _taskbarLabel.IsActivityPreviewEnabled;
                 ApplyActivityIndicatorState();
             });
-        _taskbarLabel.DisplayedLimitPreferenceChanged += preference =>
-            Dispatcher.BeginInvoke(() => SetDisplayedLimitPreference(preference));
         _taskbarLabel.DesktopModeRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget));
-        _taskbarLabel.StartupToggleRequested += (_, _) =>
-            Dispatcher.BeginInvoke(ToggleStartupRegistration);
         _taskbarLabel.UpdateCheckRequested += (_, _) =>
             Dispatcher.BeginInvoke(CheckForUpdates);
         _taskbarLabel.ExitRequested += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
@@ -117,25 +108,26 @@ public partial class MainWindow : Window
         _trayIcon.OpenRequested += (_, _) => Dispatcher.BeginInvoke(_widgetVisibility.Show);
         _trayIcon.RefreshRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => _ = _usageMonitor.RefreshAsync());
-        _trayIcon.ActivityDotsSetupRequested += (_, _) =>
-            Dispatcher.BeginInvoke(ShowActivityHookSetup);
+        _trayIcon.SettingsRequested += (_, _) => Dispatcher.BeginInvoke(ShowSettings);
         _trayIcon.DesktopModeRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.DesktopWidget));
         _trayIcon.TaskbarModeRequested += (_, _) =>
             Dispatcher.BeginInvoke(() => SetDisplayMode(WidgetDisplayMode.TaskbarIndicator));
-        _trayIcon.DisplayedLimitPreferenceChanged += preference =>
-            Dispatcher.BeginInvoke(() => SetDisplayedLimitPreference(preference));
-        _trayIcon.StartupToggleRequested += (_, _) =>
-            Dispatcher.BeginInvoke(ToggleStartupRegistration);
         _trayIcon.UpdateCheckRequested += (_, _) =>
             Dispatcher.BeginInvoke(CheckForUpdates);
         _trayIcon.ExitRequested += (_, _) => Dispatcher.BeginInvoke(ExitApplication);
+        _themeController.EffectiveThemeChanged += theme =>
+            Dispatcher.BeginInvoke(() => _trayIcon.SetTheme(theme));
+        _themeController.SystemThemeChanged += theme =>
+            Dispatcher.BeginInvoke(() => _taskbarLabel.SetSystemTheme(theme));
     }
 
     private async void MainWindowOnLoaded(object sender, RoutedEventArgs e)
     {
         PositionNearWorkAreaEdge();
         _trayIcon.SetDisplayMode(_displayMode);
+        _trayIcon.SetTheme(_themeController.EffectiveTheme);
+        _taskbarLabel.SetSystemTheme(_themeController.SystemTheme);
         SetDisplayedLimitPreferenceState(_displayedLimitPreference);
         SetStartupRegistrationState(_startupRegistration.IsEnabled);
         if (_displayMode == WidgetDisplayMode.TaskbarIndicator)
@@ -213,8 +205,7 @@ public partial class MainWindow : Window
 
     private void SetDisplayedLimitPreferenceState(DisplayedLimitPreference preference)
     {
-        _taskbarLabel.SetDisplayedLimitPreference(preference);
-        _trayIcon.SetDisplayedLimitPreference(preference);
+        _settingsWindow?.SetDisplayedLimitPreference(preference);
     }
 
     private UsageWindow? ResolveDisplayedWindow(UsageSnapshot snapshot)
@@ -222,8 +213,7 @@ public partial class MainWindow : Window
         var fiveHourAvailable = DisplayedUsageSelector.IsAvailable(
             snapshot,
             DisplayedLimitPreference.FiveHour);
-        _taskbarLabel.SetFiveHourLimitAvailability(fiveHourAvailable);
-        _trayIcon.SetFiveHourLimitAvailability(fiveHourAvailable);
+        _settingsWindow?.SetFiveHourLimitAvailability(fiveHourAvailable);
 
         var resolvedPreference = DisplayedUsageSelector.ResolvePreference(
             snapshot,
@@ -284,11 +274,14 @@ public partial class MainWindow : Window
             CompactBaseHeight + additionalRows * CompactLimitRowHeight);
     }
 
-    private void ToggleDensity()
+    private void SetDensity(WidgetDensity density)
     {
-        _density = _density == WidgetDensity.Compact
-            ? WidgetDensity.Detailed
-            : WidgetDensity.Compact;
+        if (_density == density)
+        {
+            return;
+        }
+
+        _density = density;
         _densityStore.Save(_density);
         ApplyDensity(repositionBottomEdge: true);
     }
@@ -311,14 +304,60 @@ public partial class MainWindow : Window
         }
     }
 
-    private void ShowActivityHookSetup()
+    private void ShowSettings()
     {
+        if (_settingsWindow is { } existingWindow)
+        {
+            if (existingWindow.IsVisible)
+            {
+                existingWindow.Activate();
+            }
+
+            return;
+        }
+
+        var shouldReturnToTaskbar = _displayMode == WidgetDisplayMode.TaskbarIndicator;
         if (!IsVisible)
         {
             ShowWidget();
         }
 
-        _activityHookSetupWindows.Show();
+        _isSettingsOpen = true;
+        try
+        {
+            var fiveHourLimitAvailable = _latestSnapshot is { } snapshot &&
+                DisplayedUsageSelector.IsAvailable(
+                    snapshot,
+                    DisplayedLimitPreference.FiveHour);
+            var window = new SettingsWindow(
+                _themeController.Preference,
+                _density,
+                _displayedLimitPreference,
+                fiveHourLimitAvailable,
+                _startupRegistration.IsEnabled,
+                _activityHookSetupService,
+                _codexLauncher,
+                _themeController.AccentPalette)
+            {
+                Owner = this
+            };
+            _settingsWindow = window;
+            window.ThemePreferenceChanged += _themeController.SetPreference;
+            window.AccentPaletteChanged += _themeController.SetAccentPalette;
+            window.WidgetDensityChanged += SetDensity;
+            window.DisplayedLimitPreferenceChanged += SetDisplayedLimitPreference;
+            window.StartWithWindowsChanged += SetStartupRegistration;
+            window.ShowDialog();
+        }
+        finally
+        {
+            _settingsWindow = null;
+            _isSettingsOpen = false;
+            if (shouldReturnToTaskbar)
+            {
+                Hide();
+            }
+        }
     }
 
     private void SetDisplayMode(WidgetDisplayMode mode)
@@ -341,9 +380,13 @@ public partial class MainWindow : Window
         Hide();
     }
 
-    private void ToggleStartupRegistration()
+    private void SetStartupRegistration(bool enabled)
     {
-        var enabled = !_startupRegistration.IsEnabled;
+        if (_startupRegistration.IsEnabled == enabled)
+        {
+            return;
+        }
+
         if (_startupRegistration.TrySetEnabled(enabled))
         {
             SetStartupRegistrationState(enabled);
@@ -360,8 +403,7 @@ public partial class MainWindow : Window
 
     private void SetStartupRegistrationState(bool enabled)
     {
-        _taskbarLabel.SetStartupEnabled(enabled);
-        _trayIcon.SetStartupEnabled(enabled);
+        _settingsWindow?.SetStartWithWindowsEnabled(enabled);
     }
 
     private static void CheckForUpdates()
@@ -406,13 +448,13 @@ public partial class MainWindow : Window
     private async void RefreshButton_OnClick(object sender, RoutedEventArgs e) =>
         await _usageMonitor.RefreshAsync();
 
-    private void DensityButton_OnClick(object sender, RoutedEventArgs e) => ToggleDensity();
+    private void DensityButton_OnClick(object sender, RoutedEventArgs e) =>
+        SetDensity(
+            _density == WidgetDensity.Compact
+                ? WidgetDensity.Detailed
+                : WidgetDensity.Compact);
 
-    private void SettingsButton_OnClick(object sender, RoutedEventArgs e) =>
-        _taskbarLabel.OpenMenu(SettingsButton);
-
-    private void ActivityDotsButton_OnClick(object sender, RoutedEventArgs e) =>
-        ShowActivityHookSetup();
+    private void SettingsButton_OnClick(object sender, RoutedEventArgs e) => ShowSettings();
 
     private void HideButton_OnClick(object sender, RoutedEventArgs e) =>
         SetDisplayMode(WidgetDisplayMode.TaskbarIndicator);
@@ -422,7 +464,7 @@ public partial class MainWindow : Window
     private void MainWindowOnDeactivated(object? sender, EventArgs e)
     {
         if (_displayMode == WidgetDisplayMode.TaskbarIndicator &&
-            !_activityHookSetupWindows.IsOpen)
+            !_isSettingsOpen)
         {
             _widgetVisibility.HideOnDeactivated(_taskbarLabel.IsPointerOver);
         }

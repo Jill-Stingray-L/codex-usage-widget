@@ -36,11 +36,16 @@ tests/CodexUsageWidget.Tests/ Unit tests for parsing, formatting and persistence
    transitions.
 8. `CodexActivityHookSetupService` coordinates reviewable hook-file changes and reads
    trust state through `hooks/list`; `CodexHookTrustStatusParser` owns the protocol shape.
-9. `ActivityHookSetupWindow` presents setup status while a separate review dialog shows
-   the exact proposed file content before installation or removal.
+9. `ActivityHookSetupControl` presents setup status inside Settings while a separate review
+   dialog shows the exact proposed file content before installation or removal.
 10. `UsageWidgetViewModel` maps snapshots to immutable presentation state.
-11. `MainWindow` remains a window-lifecycle shell while focused user controls render
-   compact, detailed, and repeated limit-row content.
+11. `AppThemeController` applies the saved system, light, or dark theme plus the selected
+    accent palette, and observes Windows theme changes without leaking registry access into
+    view code.
+12. `MainWindow` remains a window-lifecycle shell while the Settings window coordinates
+    activity-hook setup plus immediate theme, accent, widget-layout, displayed-limit, and Windows
+    startup preferences. Focused user controls render compact, detailed, and repeated limit-row
+    content.
 
 ## Dependency direction
 
@@ -79,4 +84,6 @@ tests/CodexUsageWidget.Tests/ Unit tests for parsing, formatting and persistence
 - Keep reusable presentation state in `Views/ViewModels` and focused visual sections in
   `Views/Controls`; `MainWindow` should not absorb endpoint or rendering responsibilities.
 - Keep Win32 calls under `Infrastructure/Windows` and UI rendering under `Views`.
+- Extend user preferences through the Settings window. Keep appearance application in
+  `AppThemeController` instead of placing theme decisions in individual views.
 - Avoid placing persistence, process management, or protocol parsing in code-behind.
