@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Windows.Media;
+using CodexUsageWidget.Application;
 using CodexUsageWidget.Domain;
 using CodexUsageWidget.Localization;
 
@@ -32,13 +33,17 @@ public sealed class UsageWidgetViewModel
     public IReadOnlyList<DetailMetricViewModel> AccountMetrics { get; private init; } =
         Array.Empty<DetailMetricViewModel>();
 
+    public RateLimitResetSummaryViewModel? ResetCredits { get; private init; }
+
     public TokenActivityViewModel? TokenActivity { get; private init; }
 
     public bool HasWarning => WarningText is not null;
 
     public bool HasModelLimits => ModelLimits.Count > 0;
 
-    public bool HasAccountMetrics => AccountMetrics.Count > 0;
+    public bool HasAccountMetrics => AccountMetrics.Count > 0 || ResetCredits is not null;
+
+    public bool HasResetCredits => ResetCredits is not null;
 
     public bool HasTokenActivity => TokenActivity is not null;
 
@@ -70,6 +75,7 @@ public sealed class UsageWidgetViewModel
         GeneralLimits = GeneralLimits,
         ModelLimits = ModelLimits,
         AccountMetrics = AccountMetrics,
+        ResetCredits = ResetCredits,
         TokenActivity = TokenActivity,
         HeadlineRemainingPercent = HeadlineRemainingPercent,
         HeadlineResetsAt = HeadlineResetsAt
@@ -77,9 +83,13 @@ public sealed class UsageWidgetViewModel
 
     public static UsageWidgetViewModel FromSnapshot(
         UsageSnapshot snapshot,
-        UsageWindow? displayedWindow)
+        UsageWindow? displayedWindow,
+        TimeFormatPreference timeFormatPreference = TimeFormatPreference.Automatic)
     {
-        var generalLimits = BuildLimitViewModels(snapshot.GeneralLimits, includeBucketLabel: false);
+        var generalLimits = BuildLimitViewModels(
+            snapshot.GeneralLimits,
+            includeBucketLabel: false,
+            timeFormatPreference);
         if (generalLimits.Length == 0 || displayedWindow is not { } displayed)
         {
             return Error(Strings.Get("Status_NoLimits"));
@@ -87,7 +97,8 @@ public sealed class UsageWidgetViewModel
 
         var modelLimits = BuildLimitViewModels(
             snapshot.RateLimits.Limits.Where(limit => !limit.IsGeneral),
-            includeBucketLabel: true);
+            includeBucketLabel: true,
+            timeFormatPreference);
         var plan = FormatPlan(snapshot.RateLimits.PlanType);
 
         return new UsageWidgetViewModel
@@ -102,11 +113,16 @@ public sealed class UsageWidgetViewModel
             HeadlineResetsAt = displayed.ResetsAt,
             UpdatedText = Strings.Format(
                 "Status_LocalUpdated",
-                snapshot.FetchedAt.ToString("HH:mm:ss", CultureInfo.CurrentCulture)),
+                TimeTextFormatter.FormatTimeWithSeconds(
+                    snapshot.FetchedAt,
+                    timeFormatPreference)),
             WarningText = BuildWarning(snapshot.RateLimits.Limits),
             GeneralLimits = generalLimits,
             ModelLimits = modelLimits,
-            AccountMetrics = BuildAccountMetrics(snapshot.RateLimits),
+            AccountMetrics = BuildAccountMetrics(snapshot.RateLimits, timeFormatPreference),
+            ResetCredits = BuildResetCredits(
+                snapshot.RateLimits.ResetCredits,
+                timeFormatPreference),
             TokenActivity = snapshot.TokenActivity is null
                 ? null
                 : new TokenActivityViewModel(snapshot.TokenActivity)
@@ -115,16 +131,19 @@ public sealed class UsageWidgetViewModel
 
     private static UsageLimitViewModel[] BuildLimitViewModels(
         IEnumerable<UsageLimitBucket> limits,
-        bool includeBucketLabel) => limits
+        bool includeBucketLabel,
+        TimeFormatPreference timeFormatPreference) => limits
         .SelectMany(limit => limit.Windows.Select(window => new UsageLimitViewModel(
             includeBucketLabel
                 ? $"{limit.Label} · {UsageLabelLocalizer.Localize(window.Label)}"
                 : UsageLabelLocalizer.Localize(window.Label),
-            window)))
+            window,
+            timeFormatPreference)))
         .ToArray();
 
     private static List<DetailMetricViewModel> BuildAccountMetrics(
-        UsageRateLimits rateLimits)
+        UsageRateLimits rateLimits,
+        TimeFormatPreference timeFormatPreference)
     {
         var metrics = new List<DetailMetricViewModel>();
         var general = rateLimits.Limits.FirstOrDefault(limit => limit.IsGeneral);
@@ -152,19 +171,68 @@ public sealed class UsageWidgetViewModel
                     Math.Round(spendLimit.RemainingPercent))));
             metrics.Add(new DetailMetricViewModel(
                 Strings.Get("Usage_SpendLimitResets"),
-                spendLimit.ResetsAt.ToString("ddd HH:mm", CultureInfo.CurrentCulture)));
-        }
-
-        if (rateLimits.ResetCredits is { } resetCredits)
-        {
-            metrics.Add(new DetailMetricViewModel(
-                Strings.Get("Usage_RateLimitResets"),
-                Strings.Format(
-                    "Usage_CountAvailable",
-                    resetCredits.AvailableCount.ToString("N0", CultureInfo.CurrentCulture))));
+                TimeTextFormatter.FormatDayAndTime(
+                    spendLimit.ResetsAt,
+                    timeFormatPreference)));
         }
 
         return metrics;
+    }
+
+    private static RateLimitResetSummaryViewModel? BuildResetCredits(
+        ResetCreditSummary? resetCredits,
+        TimeFormatPreference timeFormatPreference)
+    {
+        if (resetCredits is null)
+        {
+            return null;
+        }
+
+        var availableCount = Math.Max(0, resetCredits.AvailableCount);
+        var details = (resetCredits.Credits ?? [])
+            .Where(credit => string.Equals(
+                credit.Status,
+                "available",
+                StringComparison.OrdinalIgnoreCase))
+            .OrderBy(credit => credit.ExpiresAt is null)
+            .ThenBy(credit => credit.ExpiresAt)
+            .Take((int)Math.Min(availableCount, int.MaxValue))
+            .Select(credit => new RateLimitResetCreditViewModel(
+                credit.Id,
+                credit.ExpiresAt,
+                credit.ExpiresAt is { } expiresAt
+                    ? Strings.Format(
+                        "Usage_ResetExpires",
+                        expiresAt,
+                        TimeTextFormatter.FormatTime(expiresAt, timeFormatPreference))
+                    : Strings.Get("Usage_ResetExpirationUnavailable"),
+                Strings.Get("Usage_UseReset")))
+            .ToList();
+
+        if (availableCount > details.Count)
+        {
+            details.Add(new RateLimitResetCreditViewModel(
+                CreditId: null,
+                ExpiresAt: null,
+                ExpirationText: Strings.Get("Usage_ResetExpirationUnavailable"),
+                UseButtonText: Strings.Get("Usage_UseNextReset")));
+        }
+
+        var nextExpiration = details
+            .Select(detail => detail.ExpiresAt)
+            .OfType<DateTimeOffset>()
+            .FirstOrDefault();
+        return new RateLimitResetSummaryViewModel(
+            Strings.Format(
+                "Usage_CountAvailable",
+                availableCount.ToString("N0", CultureInfo.CurrentCulture)),
+            nextExpiration == default
+                ? null
+                : Strings.Format(
+                    "Usage_ResetNextExpires",
+                    nextExpiration,
+                    TimeTextFormatter.FormatTime(nextExpiration, timeFormatPreference)),
+            details);
     }
 
     private static string? BuildWarning(IEnumerable<UsageLimitBucket> limits)

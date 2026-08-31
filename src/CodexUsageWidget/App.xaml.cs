@@ -53,17 +53,24 @@ public partial class App : System.Windows.Application, IDisposable
             var appServerSession = new CodexAppServerSession();
             var codexUsageProvider = new CodexUsageProvider(appServerSession);
             IUsageProvider usageProvider = codexUsageProvider;
+            IRateLimitResetConsumer resetConsumer =
+                new CodexRateLimitResetConsumer(
+                    appServerSession,
+                    new RateLimitResetAttemptStore());
             var usagePreviewEnabled = false;
 #if DEBUG || USAGE_PREVIEW
             if (e.Args.Contains("--preview-usage", StringComparer.OrdinalIgnoreCase))
             {
                 usagePreviewEnabled = true;
-                usageProvider = new PreviewUsageProvider(codexUsageProvider);
+                var previewProvider = new PreviewUsageProvider(codexUsageProvider);
+                usageProvider = previewProvider;
+                resetConsumer = previewProvider;
                 _logger.Info("Usage preview mode is active.");
             }
 #endif
             var usageMonitor = new UsageMonitor(usageProvider);
             usageMonitor.DiagnosticMessage += (_, message) => _logger.Info(message);
+            var resetUseCase = new RateLimitResetUseCase(resetConsumer, usageMonitor);
 
             activityMonitor = new CodexActivityMonitor(new CodexActivityPipeSignalSource());
             activityMonitor.DiagnosticMessage += (_, message) => _logger.Info(message);
@@ -89,6 +96,7 @@ public partial class App : System.Windows.Application, IDisposable
 
             var window = new MainWindow(
                 usageMonitor,
+                resetUseCase,
                 activityMonitor,
                 activityHookSetupService,
                 new CodexCliLauncher(),
@@ -98,7 +106,8 @@ public partial class App : System.Windows.Application, IDisposable
                 startupRegistrationService,
                 new TrayIconService(),
                 _themeController,
-                _languageController);
+                _languageController,
+                new TimeFormatPreferenceStore());
             MainWindow = window;
             activityMonitor.StartAsync().GetAwaiter().GetResult();
             window.Show();
