@@ -36,7 +36,7 @@ Codex Usage Widget 是一款在 Windows 本地运行的小组件，通过官方 
   Token 活动以及 Codex 返回的模型专属限制
 - 可在设置中选择跟随系统、浅色或深色主题，并提供五种预设强调色
 - 自动检测 Windows 显示语言，不支持的语言回退到英语；也可在设置中固定使用英语或简体中文
-- 可在设置中选择 Windows 区域、24 小时制或 12 小时制时间格式
+- 可在设置中选择 Windows 区域时间格式、24 小时制或 12 小时制
 - 可移动、始终置顶的桌面小组件，以及位于 Windows 通知区域旁的紧凑任务栏标签
 - 根据官方 Codex 本地生命周期钩子显示实时运行状态点
 - 每两分钟自动刷新，并接收实时用量限制通知
@@ -96,7 +96,7 @@ Token 活动仅供参考。Token 数量与订阅用量的剩余百分比并不�
 - `theme.txt`：跟随系统、浅色或深色主题偏好
 - `accent-palette.txt`：所选的预设强调色
 - `language.txt`：跟随系统、英语或简体中文语言偏好
-- `time-format.txt`：Windows 区域、24 小时制或 12 小时制时间偏好
+- `time-format.txt`：Windows 区域时间格式、24 小时制或 12 小时制偏好
 - `pending-rate-limit-reset.json`：在 Codex 返回明确结果前保存未完成的重置尝试，
   防止重试时使用另一个重置
 - `logs\codex-usage-widget-YYYYMMDD.log`：诊断日志，保留 14 天
